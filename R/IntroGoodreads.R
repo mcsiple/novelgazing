@@ -3,17 +3,21 @@
 # devtools::install_github("gadenbuie/ggpomological")
 
 
-library(rgoodreads)
-library(httr)  
+#library(rgoodreads)
+#library(httr)  
+library(lubridate)
+library(here)
 library(tidyverse)
 library(hrbrthemes)
-library(gcookbook)
-library(lubridate)
+#library(gcookbook)
 library(ggpomological)
 library(reshape2)
 
 # Load your own user data separately
+read_books <- read.csv(here::here('data','goodreads_library_export.csv'),
+                       header=T)
 
+# book pages
 read_books %>%
   ggplot(aes(year_read)) +
   geom_bar(stat = "count") +
@@ -34,7 +38,8 @@ criticplot <- read_books %>%
   geom_point(aes(x=year_read,y=my_mean_rating),colour="#d95f0e",size=3) + #blue indicates my rating
   ylab("Average rating") +
   xlab("Year") +
-  scale_x_continuous(breaks=seq(2009,2020,by=2),labels=seq(2009,2020,by=2)) +
+  scale_x_continuous(breaks=seq(2009,2020,by=2),
+                     labels=seq(2009,2020,by=2)) +
   ggtitle("Has Megsie become a more critical reader?")
 
 
