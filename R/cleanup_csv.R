@@ -1,8 +1,6 @@
 library(lubridate)
 library(here)
 library(tidyverse)
-library(ggpomological)
-library(reshape2)
 library(snakecase)
 
 #testfile <- here::here('data','goodreads_library_export.csv')
