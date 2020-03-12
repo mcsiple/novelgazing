@@ -1,60 +1,55 @@
 
 library(shiny)
+library(shinythemes)
+library(tidyverse)
 
 # Define UI for application that draws a histogram
-ui <- fluidPage(
-   
-   # Application title
-   titlePanel("Novel-Gazing"),
-   
+ui <- navbarPage('Novel-Gazing',
+                 theme = shinytheme("yeti"),
+                 tabPanel("1. Your books",
    # Sidebar with a slider input for number of bins 
    sidebarLayout(
       sidebarPanel(
-         sliderInput("bins",
-                     "Number of bins:",
-                     min = 1,
-                     max = 50,
-                     value = 30),
+         imageOutput('preImage'),
+         h4('Upload your Goodreads data.'),
+         p('Goodreads allows you to export your bookshelves as a CSV file.'),
          fileInput("grexport", "Choose CSV File",
                    accept = c("text/csv",
                               "text/comma-separated-values,text/plain",
                               ".csv"))
       ),
-      
-      # Show a plot of the generated distribution
       mainPanel(
-         plotOutput("distPlot"),
-         tableOutput("rawdata")
+         h3('Your reading at a glance'),
+         h4('Check your data'),
+         tableOutput('rawdata'),
          
-      )
+         
+      ))),
+   tabPanel("2. Reading history"),
+   tabPanel("3. Diversity & sentiments")
    )
-)
+
 
 # Define server logic required to draw a histogram
 server <- function(input, output) {
+   # Image
+   output$preImage <- renderImage({
+      filename <- normalizePath(here::here('NovelGazingApp','images','test.jpg'))
+      # Return a list containing the filename and alt text
+      list(src = filename,
+           alt = 'test')
+   }, deleteFile = FALSE)
    
-   output$distPlot <- renderPlot({
-      # generate bins based on input$bins from ui.R
-      x    <- faithful[, 2] 
-      bins <- seq(min(x), max(x), length.out = input$bins + 1)
-      
-      # draw the histogram with the specified number of bins
-      hist(x, breaks = bins, col = 'darkgray', border = 'white')
-   })
-   
+   # Raw data
    output$rawdata <- renderTable({
-     # input$file1 will be NULL initially. After the user selects
-     # and uploads a file, it will be a data frame with 'name',
-     # 'size', 'type', and 'datapath' columns. The 'datapath'
-     # column will contain the local filenames where the data can
-     # be found.
      inFile <- input$grexport
-     
      if (is.null(inFile)) return(NULL)
-     
      x <- read.csv(inFile$datapath, header = TRUE)
-     print(head(x))
+     show <- x %>% 
+              select(Title, Author, ISBN, My.Rating,Number.of.Pages)
+     head(show,n = 3)
    })
+   
 }
 
 # Run the application 
