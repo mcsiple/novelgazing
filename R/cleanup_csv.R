@@ -17,7 +17,9 @@ cleanup_csv <- function(csvfile){
   read_books <- my_books %>%
     select(one_of(keeper_cols)) %>%
     mutate(date_read = ymd(date_read),
-           year_read = year(date_read))
+           year_read = year(date_read),
+           date_added = ymd(date_added),
+           year_added = year(date_added))
   return(read_books)
 }
 
