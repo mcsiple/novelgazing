@@ -4,9 +4,10 @@ library(tidyverse)
 library(snakecase)
 
 #testfile <- here::here('data','goodreads_library_export.csv')
+#my_books <- read.csv(testfile,header = TRUE)
 
-cleanup_csv <- function(csvfile){
-  my_books <- read.csv(csvfile,header = TRUE)
+cleanup_csv <- function(my_books){
+  # my_books is a dataframe from read.csv()
   orig_colnames <- colnames(my_books)  # get original colnames
   new_colnames <- to_any_case(orig_colnames, case = "snake")
   colnames(my_books) <- new_colnames  # assign new colnames
