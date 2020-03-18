@@ -8,8 +8,11 @@ library(rvest) # for cool html stuff
 library(lubridate)
 library(curl) #for id'ing agent to server
 
+#startUrl <- "https://www.goodreads.com/review/list/8200244-megsie"
 
-startUrl <- "https://www.goodreads.com/review/list/8200244-megsie"
+usernumber <- 8200244
+username <- 'megsie'
+startUrl <- paste('https://www.goodreads.com/review/list/',usernumber,'-',username,sep='')
 
 # function to get book descriptions
 getBookDescription <- function(bookLink) {
@@ -105,12 +108,12 @@ getnbooks <- function(){
 (npages <- ceiling(getnbooks()/30) ) # 30 entries per page
 
 goodreads <- map_df(1:npages, ~{
-  Sys.sleep(10) # don't timeout the goodreads server
+  Sys.sleep(5) # don't timeout the goodreads server
   cat(.x)
   getBooks(.x)
 })
 
-# save xls
+# save xls of everything else
 goodreads %>% 
   select(-book_genres) %>%
 write_csv(path = here('output', 
