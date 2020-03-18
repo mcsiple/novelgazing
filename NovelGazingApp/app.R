@@ -2,6 +2,7 @@
 library(shiny)
 library(shinythemes)
 library(tidyverse)
+library(here)
 
 source(here('R','cleanup_csv.R'))
 source(here('R','basic_diagnostics.R'))
@@ -40,8 +41,23 @@ ui <- navbarPage('Novel-Gazing',
          plotOutput('basicstuff')
          
       ))),
-   tabPanel("2. Reading history"),
-   tabPanel("3. Diversity & sentiments")
+   tabPanel("2. Webscrape your books"
+            ,
+            sidebarLayout(
+               sidebarPanel(
+                  h4('Enter your account data'),
+                  p('Enter your goodreads user id and username. You can find them in the URL for your Goodreads account.'),
+                  numericInput(inputId = 'userid',value = 0,label = 'User ID'),
+                  textInput(inputId = "username",label = "User name",placeholder = "Enter your user name"),
+                  p('NOTE: This will take a LONG time (~3 mins per page) so go get a coffee after you enter your info and click the button.'),
+                  actionButton("go", "Fetch my data!", icon("book", lib = "glyphicon","fa-2x"),
+                               style="color: #fff; background-color: #ff7506; border-color: #ff7506")
+                 ),
+               mainPanel(verbatimTextOutput("userid"))
+             )),
+   tabPanel("3. Diversity & sentiments",
+            h3('How diverse is your reading?',
+               p('Once you have successfully webscraped your data, you can look at it like we would an ecological community. How diverse are the genres you read? ')))
    )
 
 
