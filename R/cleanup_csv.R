@@ -14,7 +14,7 @@ cleanup_csv <- function(my_books){
   colnames(my_books)  # check to make sure it worked
   keeper_cols <- c("book_id", "title", "author", "my_rating", "number_of_pages", 
                    "original_publication_year", "date_read", "date_added", "bookshelves",
-                   "my_rating","average_rating")
+                   "exclusive_shelf","my_rating","average_rating")
   read_books <- my_books %>%
     select(one_of(keeper_cols)) %>%
     mutate(date_read = ymd(date_read),
@@ -24,4 +24,4 @@ cleanup_csv <- function(my_books){
   return(read_books)
 }
 
-#cleanup_csv(testfile)
+#cleanup_csv(my_books)
