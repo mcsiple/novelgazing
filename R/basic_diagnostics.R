@@ -90,3 +90,47 @@ basic_diagnostics <- function(cleaned_csv = cleaned_csv1,
 }
 
 #basic_diagnostics(cleaned_csv = cleaned_csv1,pal = bookpal)
+
+time_to_finish_shelves <- function(cleaned_csv = cleaned_csv1,
+                           pal = bookpal){
+  read_books <- cleaned_csv
+  x <- read_books %>% 
+    group_by(exclusive_shelf) %>%
+    summarize(n = length(title)) 
+  
+  nread <- x %>%
+    filter(exclusive_shelf=='read') %>%
+    select(n) %>%
+    as.numeric()
+  
+  n2read <- x %>%
+    filter(exclusive_shelf=='to-read') %>%
+    select(n) %>%
+    as.numeric()
+  
+  nyears <- max(read_books$year_read,na.rm=T) - min(read_books$year_added,na.rm=T)
+  bpy <- nread/nyears
+  print(nread)
+  print(bpy)
+  print(n2read)
+  nyears_to_finish <- n2read/bpy
+  
+  #Plot 
+  ibp <- read_books %>%
+    filter(exclusive_shelf == 'read') %>%
+    mutate(ttr = year_read - year_added) %>%
+    mutate(title = fct_reorder(title, ttr, max, .desc = TRUE)) %>%
+    top_n(6) %>%
+    arrange(desc(-ttr)) %>%
+    ggplot(aes(title,ttr)) +
+    geom_col(fill = pal[1]) +
+    ggsidekick::theme_sleek(base_size = 16) +
+    scale_x_discrete(labels = function(x) str_wrap(x, width = 40)) +
+    xlab("Books you waited longest to read") +
+    ylab("Years between adding the book \nto your shelf and reading it") +
+    coord_flip()
+    
+  return(list(nyears_to_finish = nyears_to_finish,
+              ind_books_plot = ibp))
+}
+#time_to_finish_shelves(cleaned_csv = cleaned_csv1,pal = bookpal)
