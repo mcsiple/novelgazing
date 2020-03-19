@@ -1,18 +1,19 @@
 #Sentiments, etc
-library(tidyverse)
-library(tidytext)
+#library(tidyverse)
+#library(tidytext)
 
-bookpal <- c('#ff7506', #dark orange
-             '#00eaff', #(cyan)
-             '#ffdf06', #(dark yellow)
-             '#ffee7d', #(light yellow)
-             '#ff2673', #(magenta)
-             '#7df4ff') #(light cyan)
+# bookpal <- c('#ff7506', #dark orange
+#              '#00eaff', #(cyan)
+#              '#ffdf06', #(dark yellow)
+#              '#ffee7d', #(light yellow)
+#              '#ff2673', #(magenta)
+#              '#7df4ff') #(light cyan)
 
-goodreads <- read.csv(here::here('output','goodreads_read.csv'))
-read_books_data <- goodreads
+#goodreads <- read.csv(here::here('output','goodreads_read.csv'))
+#read_books_data <- goodreads
 
 tidy_the_books <- function(read_books_data){
+  #read_books_data is the scraped data 'goodreads_read'
   clean_book_descs <- read_books_data %>%
     mutate(clean_desc = str_replace_all(book_description, "[^a-zA-Z\\s]", " ")) %>%
     mutate(clean_desc = str_trim(clean_desc, side = "both"))
