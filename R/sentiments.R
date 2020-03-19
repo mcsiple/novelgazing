@@ -2,72 +2,86 @@
 library(tidyverse)
 library(tidytext)
 
+bookpal <- c('#ff7506', #dark orange
+             '#00eaff', #(cyan)
+             '#ffdf06', #(dark yellow)
+             '#ffee7d', #(light yellow)
+             '#ff2673', #(magenta)
+             '#7df4ff') #(light cyan)
+
 goodreads <- read.csv(here::here('output','goodreads_read.csv'))
 read_books_data <- goodreads
 
-clean_book_descs <- read_books_data %>%
-  mutate(clean_desc = str_replace_all(book_description, "[^a-zA-Z\\s]", " ")) %>%
-  mutate(clean_desc = str_trim(clean_desc, side = "both"))
+tidy_the_books <- function(read_books_data){
+  clean_book_descs <- read_books_data %>%
+    mutate(clean_desc = str_replace_all(book_description, "[^a-zA-Z\\s]", " ")) %>%
+    mutate(clean_desc = str_trim(clean_desc, side = "both"))
+  
+  descs_unnested <- clean_book_descs %>%
+    unnest_tokens(word, clean_desc) %>%
+    select(-book_description)
+  
+  data('stop_words')
+  tidied_books <- descs_unnested %>%
+    anti_join(stop_words, by = "word")
+  return(tidied_books)
+}
 
+#tidy_the_books(read_books_data)
 
-descs_unnested <- clean_book_descs %>%
-  unnest_tokens(word, clean_desc) %>%
-  select(-book_description)
+getnbooks <- function(tidied_books){
+  nbooks <- tidy_books %>%
+    group_by(year_read) %>%
+    summarize(nbooks = length(unique(title))) 
+  return(nbooks)
+}
 
-data('stop_words')
+get_bing_plot <- function(tidied_books){
+  word_bing <- tidy_books %>%
+    inner_join(get_sentiments("bing"), by = "word") %>%
+    group_by(year_read,sentiment) %>%
+    summarize(n = length(sentiment)) %>%
+    left_join(nbooks,by = 'year_read') %>%
+    mutate(n_scaled = (n/nbooks)*ifelse(sentiment == 'negative',-1,1)) # negative or pos words scaled to the number of descriptions
+  
+  # NOTE: maybe turn this into a stacked density plot! with positive and negative sentiment scores
+  bp <- word_bing %>%
+    ggplot(aes(year_read,n_scaled,fill = sentiment)) +
+    geom_hline(yintercept = 0,lty=2,colour='darkgrey')+
+    geom_col(lwd=0.6,colour = 'darkgrey') +
+    scale_fill_manual('Bing sentiment score',
+                      values = bookpal[c(5,3)]) + 
+    xlab('Year') +
+    ylab('Word positivity') +
+    ggsidekick::theme_sleek(base_size = 12)
+  return(bp)
+}
 
-tidy_books <- descs_unnested %>%
-  anti_join(stop_words, by = "word")
-
-nbooks <- tidy_books %>%
-  group_by(year_read) %>%
-  summarize(nbooks = length(unique(title))) 
-
-word_bing <- tidy_books %>%
-  inner_join(get_sentiments("bing"), by = "word") %>%
-  group_by(year_read,sentiment) %>%
-  summarize(n = length(sentiment)) %>%
-  left_join(nbooks,by = 'year_read') %>%
-  mutate(n_scaled = (n/nbooks)*ifelse(sentiment == 'negative',-1,1)) #negative or pos words scaled to the number of descriptions
-
-word_bing %>%
-  group_by(year_read) %>%
-  summarize(score = mean(n_scaled)) %>%
-  ggplot(aes(year_read,score)) +geom_line()
-
-# NOTE: maybe turn this into a stacked density plot! with positive and negative sentiment scores
-word_bing %>%
-  ggplot(aes(year_read,n_scaled,fill = sentiment)) +
-  geom_col(lwd=1) +
-  scale_fill_manual('Sentiment',
-                    values = calecopal::cal_palette('chaparral1')) + 
-  xlab('Year') +
-  ylab('Word positivity') +
-  ggpomological::theme_pomological()
-
-tidy_book_words <- tidy_books %>%
-  group_by(year_read,word) %>%
-  count(word, sort = TRUE)
-tidy_book_words
-
-# NOTE: want to show this as a cute kable table
-data(sentiments)
-word_sentiments <- tidy_book_words %>%
-  inner_join(get_sentiments("afinn"), by = "word") 
-
-
-word_sentiments
-
-word_sentiments %>% 
-  filter(!is.na(year_read)) %>%
-  ggplot(aes(value)) + 
-  geom_bar() +  
-  facet_wrap(~year_read) + # NOTE: change this to little dots! the new density thing
-  ggpomological::theme_pomological(base_size = 14) +
-  xlab('Score') +
-  ylab('Count') +
-  labs(title = 'Sentiment scores',
-       subtitle = 'AFINN sentiment score frequency by year',
-       caption = 'Data: Goodreads')
-
+get_word_table <- function(tidied_books){
+  tidy_book_words <- tidy_books %>%
+    group_by(year_read,word) %>%
+    count(word, sort = TRUE)
+  # most frequent words in descriptions of your books
+  return(tidy_book_words) # NOTE: show this as a cute kable table
+}
+  
+get_AFINN_plot <- function(tidied_books){
+ data(sentiments)
+  word_sentiments <- tidy_book_words %>%
+    inner_join(get_sentiments("afinn"), by = "word") 
+  word_sentiments
+  
+  afinnplot <- word_sentiments %>% 
+    filter(!is.na(year_read)) %>%
+    ggplot(aes(value)) + 
+    geom_bar() +  
+    facet_wrap(~year_read) + # NOTE: change this to little dots! the new density thing
+    ggsidekick::theme_sleek(base_size=12) +
+    xlab('Score') +
+    ylab('Count') +
+    labs(title = 'Sentiment scores',
+         subtitle = 'AFINN sentiment score frequency by year',
+         caption = 'Data: Goodreads')
+  return(afinnplot)
+}
 
