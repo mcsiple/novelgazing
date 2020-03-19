@@ -2,62 +2,107 @@
 library(shiny)
 library(shinythemes)
 library(tidyverse)
-library(here)
+#library(here)
+library(stringr)
+library(rvest) # for cool html stuff
+library(lubridate)
+library(curl) #for id'ing agent to server
 
-source(here('R','cleanup_csv.R'))
-source(here('R','basic_diagnostics.R'))
+library(tidytext) #for sentiment analysis
 
 
+source(here::here('R','cleanup_csv.R'))
+source(here::here('R','basic_diagnostics.R'))
+source(here::here('R','scrape_data.R'))
+source(here::here('R','sentiments.R'))
+source(here::here('R','jumbotron2.R'))
 # Aesthetics --------------------------------------------------------------
 bookpal <- c('#ff7506', #dark orange
              '#00eaff', #(cyan)
              '#ffdf06', #(dark yellow)
              '#ffee7d', #(light yellow)
-             '#ff2673', #(magenta )
-             '#7df4ff') #(light cyan )
+             '#ff2673', #(magenta)
+             '#7df4ff') #(light cyan)
+
+# Functions ---------------------------------------------------------------
 
 
 
 # ui ----------------------------------------------------------------------
-ui <- navbarPage('Novel-Gazing',
+ui <- navbarPage('Novel-gazing',
                  theme = shinytheme("yeti"),
-                 tabPanel("1. Your books",
+                 tabPanel("Home",
+                          fluidPage(column(9, 
+                                           br(),
+                                           br(),
+                                           br(),
+                          jumbotron2("Welcome to Novel-gazing", "This app takes your reading data from Goodreads and shows you a bunch of fun diagnostics. It is a labor of love.",button=FALSE)),
+                          column(1,
+                          imageOutput('preImageLarge',inline = TRUE))
+                          )),
+  tabPanel("1. Your books",
    # Sidebar with a slider input for number of bins 
    sidebarLayout(
       sidebarPanel(
-         imageOutput('preImage'),
+         imageOutput('preImage',inline = TRUE),
          h4('Upload your Goodreads data.'),
-         p('Goodreads allows you to export your bookshelves as a CSV file.'),
          fileInput("grexport", "Choose CSV File",
                    accept = c("text/csv",
                               "text/comma-separated-values,text/plain",
                               ".csv"))
       ),
       mainPanel(
-         h3('Your reading at a glance'),
+         h3('How to get your data'),
+         p('Goodreads allows you to export a .csv file from your account.'),
+         imageOutput('HowToAll',inline = TRUE),
+         h4('Getting your data from Goodreads:'),
+         p('1. From your home page, go to My Books'),
+         p('2. On the left, go to Import/Export'),
+         p('3. Click Export Library to download your reading data as a csv.'),
+         p('4. Upload it to the left, and if you see the header below, you are set to jet!'),
+         br(),
+         br(),
          h4('A glimpse of your data'),
-         tableOutput('rawdata'),
-         h4('Reading history'),
-         plotOutput('basicstuff')
-         
+         tableOutput('rawdata')
       ))),
-   tabPanel("2. Webscrape your books"
+  tabPanel("2. The big picture",
+           h4('Reading history'),
+           plotOutput('basicstuff'),
+           h3('How long does it take you to read a book after adding it to your shelf?'),
+           fluidRow(column(8,
+           plotOutput('timeplot')),
+           column(4,
+                  br(),
+                  br(),
+                  br(),
+                  br(),
+                  htmlOutput('timestatement'))
+           )
+  ),
+   tabPanel("3. Webscrape your books"
             ,
             sidebarLayout(
                sidebarPanel(
-                  h4('Enter your account data'),
-                  p('Enter your goodreads user id and username. You can find them in the URL for your Goodreads account.'),
-                  numericInput(inputId = 'userid',value = 0,label = 'User ID'),
+                  h4('Enter your account info'),
+                  p('Enter your goodreads user id and username. You can find them in the URL for your Goodreads account. Your account must be public to do this part.'),
+                  textInput(inputId = "userid",label = "User ID",placeholder = "Enter your user ID"),
                   textInput(inputId = "username",label = "User name",placeholder = "Enter your user name"),
                   p('NOTE: This will take a LONG time (~3 mins per page) so go get a coffee after you enter your info and click the button.'),
-                  actionButton("go", "Fetch my data!", icon("book", lib = "glyphicon","fa-2x"),
+                  actionButton("go", "Get my data!", icon("book", lib = "glyphicon","fa-2x"),
                                style="color: #fff; background-color: #ff7506; border-color: #ff7506")
                  ),
-               mainPanel(verbatimTextOutput("userid"))
+               mainPanel(#verbatimTextOutput("userid"),
+                  h4('A glimpse of the scraped data'),
+                         tableOutput('scraped'),
+                  p('Now you can look at some more fun patterns in your reading habits.'),
+                  br(),
+                  plotOutput('sentiments')
+                         )
              )),
-   tabPanel("3. Diversity & sentiments",
-            h3('How diverse is your reading?',
-               p('Once you have successfully webscraped your data, you can look at it like we would an ecological community. How diverse are the genres you read? ')))
+  
+   tabPanel("4. Diversity & sentiments",
+            h3('How diverse is your reading?'),
+               p('Once you have successfully webscraped your data, you can look at it like we would an ecological community. How diverse are the genres you read? '))
    )
 
 
@@ -67,13 +112,27 @@ server <- function(input, output) {
    # Image
    output$preImage <- renderImage({
       filename <- normalizePath(here::here('NovelGazingApp','images','book_logo.png'))
-      # Return a list containing the filename and alt text
       list(src = filename,
            alt = 'test',
            width = 240,
            height = 240)
    }, deleteFile = FALSE)
    
+   output$preImageLarge <- renderImage({
+      filename <- normalizePath(here::here('NovelGazingApp','images','book_logo_long.png'))
+      list(src = filename,
+           alt = 'test',
+           width = 200)
+   }, deleteFile = FALSE)
+   
+   output$HowToAll <- renderImage({
+      filename <- normalizePath(here::here('NovelGazingApp','images','HowToAll.png'))
+      list(src = filename,
+           alt = 'ht1',
+           width = 600)
+   }, deleteFile = FALSE)
+   
+  
    # Raw data
    rawdatafile <- reactive({
       inFile <- input$grexport
@@ -98,6 +157,48 @@ server <- function(input, output) {
       basic_diagnostics(plotdat,pal = bookpal)}
    })
    
+   scraped_data <- eventReactive(input$go,{
+       # Re-run when button is clicked
+      withProgress(message = 'Scraping your reading data', value = 0, {
+         n = ceiling(getnbooks()/30) 
+         print(n)
+         n=1
+         goodreads <- map_df(1:n, ~{
+            Sys.sleep(6) # don't timeout the goodreads server
+            #cat(.x)
+            incProgress(1/n, detail = paste("Extracting page", .x))
+            get_books(.x)
+         })
+      })
+      goodreads
+   })
+   
+   output$scraped <- renderTable({
+      goodreads <- scraped_data()
+      (head(goodreads[,1:2]))
+   })
+  
+   output$sentiments <- renderPlot({
+      x <- get_cmatrix_and_genres(scraped_data = scraped_data())$goodreads_read
+      tidied <- tidy_the_books(read_books_data = x)
+      get_bing_plot(tidied)
+   })
+   
+   output$timeplot <- renderPlot({
+      if(is.null(rawdatafile())){NULL}else{
+         c <- cleanup_csv(rawdatafile())
+         time_to_finish_shelves(cleaned_csv = c,pal = bookpal)$ind_books_plot
+         }
+   })
+   
+   output$timestatement <- renderUI({
+      if(is.null(rawdatafile())){NULL}else{
+         c <- cleanup_csv(rawdatafile())
+         yrs <- time_to_finish_shelves(cleaned_csv = c,pal = bookpal)$nyears_to_finish
+         textout <- paste('At your current rate, it will take you','<b>', yrs,'</b>','years to finish everything on your shelves.')
+         HTML(paste(textout))
+      }
+   })
 }
 
 # Run the application 
