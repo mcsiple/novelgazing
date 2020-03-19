@@ -2,17 +2,17 @@
 # https://maraaverick.rbind.io/2017/10/goodreads-part-2/
 # I added a few pieces of info including the 'community matrix'
 
-library(tidyverse)
-library(stringr)
-library(rvest) # for cool html stuff
-library(lubridate)
-library(curl) #for id'ing agent to server
+# library(tidyverse)
+# library(stringr)
+# library(rvest) # for cool html stuff
+# library(lubridate)
+# library(curl) #for id'ing agent to server
+# 
 
-#startUrl <- "https://www.goodreads.com/review/list/8200244-megsie"
 
-usernumber <- 8200244
-username <- 'megsie'
-startUrl <- paste('https://www.goodreads.com/review/list/',usernumber,'-',username,sep='')
+#usernumber <- 8200244
+#username <- 'megsie'
+#startUrl <- paste('https://www.goodreads.com/review/list/',usernumber,'-',username,sep='')
 
 # function to get book descriptions
 getBookDescription <- function(bookLink) {
@@ -32,7 +32,7 @@ get_genres <- function(bookLink){
 }
 
 # function to get books
-getBooks <- function(i) {
+get_books <- function(i) {
   #cat(i, "\n")
   url <- str_c(startUrl, "?page=", i, "&shelf=read")
   
@@ -80,8 +80,6 @@ getBooks <- function(i) {
     yearRead = yearRead1}else{
       yearRead = yearRead2$year}
   
-  #Sys.sleep(5)
-  
   return(
     tibble(
       title = title,
@@ -105,38 +103,45 @@ getnbooks <- function(){
 }
 
 # get books (this takes a while!)
-(npages <- ceiling(getnbooks()/30) ) # 30 entries per page
+#(npages_in <- ceiling(getnbooks()/30) ) # 30 entries per page
 
-goodreads <- map_df(1:npages, ~{
-  Sys.sleep(5) # don't timeout the goodreads server
-  cat(.x)
-  getBooks(.x)
-})
+# scrape_goodreads <- function(npages){
+#   goodreads <- map_df(1:npages, ~{
+#     Sys.sleep(5) # don't timeout the goodreads server
+#     cat(.x)
+#     get_books(.x)
+#   })
+#   return(goodreads)
+# }
 
-# save xls of everything else
-goodreads %>% 
-  select(-book_genres) %>%
-write_csv(path = here('output', 
-                      'goodreads_read.csv'))
-
-# save genre data
-genres <- goodreads %>%
-  select(book_genres,year_read) %>%
-  mutate(id = 1:n()) %>%
-  unnest_longer(book_genres)
+# get big fun matrix for further analysis
+get_cmatrix_and_genres <- function(scraped_data){
+  goodreads <- scraped_data
+  goodreads_read <- goodreads %>%
+    select(-book_genres)
+  #write_csv(path = here('output',
+  #                      'goodreads_read.csv'))
+  # save genre data
+  genres <- goodreads %>%
+    select(book_genres,year_read) %>%
+    mutate(id = 1:n()) %>%
+    unnest_longer(book_genres)
   
-# Turn genres into 'community matrix'
-community <-  genres %>% 
-              pivot_longer(c(-id,-year_read)) %>% 
-              dplyr::count(year_read, value) %>% # to give each book its own diversity, change to dplyr::count(id, value)
-              pivot_wider(
-                names_from = value, 
-                values_from = n, 
-                values_fill = list(n = 0)
-                ) %>%
-                as.data.frame()
-
-write_csv(community, path = here('output','communitymatrix.csv'))
+  # Turn genres into 'community matrix'
+  community <-  genres %>% 
+    pivot_longer(c(-id,-year_read)) %>% 
+    dplyr::count(year_read, value) %>% # to give each book its own diversity, change to dplyr::count(id, value)
+    pivot_wider(
+      names_from = value, 
+      values_from = n, 
+      values_fill = list(n = 0)
+    ) %>%
+    as.data.frame()
+  return(list(community = community,
+              genres = genres,
+              goodreads_read = goodreads_read))
+}
+#write_csv(community, path = here('output','communitymatrix.csv'))
 
 
 
