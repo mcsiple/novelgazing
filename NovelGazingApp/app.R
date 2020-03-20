@@ -2,12 +2,11 @@
 library(shiny)
 library(shinythemes)
 library(tidyverse)
-#library(here)
 library(stringr)
 library(rvest) # for cool html stuff
 library(lubridate)
 library(curl) #for id'ing agent to server
-
+library(snakecase)
 library(tidytext) #for sentiment analysis
 
 
@@ -66,7 +65,7 @@ ui <- navbarPage('Novel-gazing',
          tableOutput('rawdata')
       ))),
   tabPanel("2. The big picture",
-           h4('Reading history'),
+           h3('Reading history'),
            plotOutput('basicstuff'),
            h3('How long does it take you to read a book after adding it to your shelf?'),
            fluidRow(column(8,
@@ -83,7 +82,7 @@ ui <- navbarPage('Novel-gazing',
             ,
             sidebarLayout(
                sidebarPanel(
-                  h4('Enter your account info'),
+                  h4('Enter your Goodreads user info'),
                   p('Enter your goodreads user id and username. You can find them in the URL for your Goodreads account. Your account must be public to do this part.'),
                   textInput(inputId = "userid",label = "User ID",placeholder = "Enter your user ID"),
                   textInput(inputId = "username",label = "User name",placeholder = "Enter your user name"),
@@ -91,18 +90,18 @@ ui <- navbarPage('Novel-gazing',
                   actionButton("go", "Get my data!", icon("book", lib = "glyphicon","fa-2x"),
                                style="color: #fff; background-color: #ff7506; border-color: #ff7506")
                  ),
-               mainPanel(#verbatimTextOutput("userid"),
+               mainPanel(
                   h4('A glimpse of the scraped data'),
                          tableOutput('scraped'),
-                  p('Now you can look at some more fun patterns in your reading habits.'),
+                  p('Now you can look at some more fun patterns in the descriptions of your books.'),
                   br(),
                   plotOutput('sentiments')
                          )
              )),
   
-   tabPanel("4. Diversity & sentiments",
+   tabPanel("4. The ecology of your bookshelf",
             h3('How diverse is your reading?'),
-               p('Once you have successfully webscraped your data, you can look at it like we would an ecological community. How diverse are the genres you read? '))
+               p('Once you have successfully webscraped your data, you can look at it like we would an ecological community. How diverse are the genres you read? How has the richness of your reading changed over time?'))
    )
 
 
@@ -159,8 +158,14 @@ server <- function(input, output) {
    
    scraped_data <- eventReactive(input$go,{
        # Re-run when button is clicked
+      #usernumber <- '8200244'
+      #username <- 'megsie'
+      usernumber <- input$userid
+      username <- input$username
+      startUrl <- paste('https://www.goodreads.com/review/list/',usernumber,'-',username,sep='')
+      #startUrl <- "https://www.goodreads.com/review/list/8200244-megsie"
       withProgress(message = 'Scraping your reading data', value = 0, {
-         n = ceiling(getnbooks()/30) 
+         n = ceiling(getnbooks(stUrl=startUrl)/30) 
          print(n)
          n=1
          goodreads <- map_df(1:n, ~{
@@ -181,7 +186,7 @@ server <- function(input, output) {
    output$sentiments <- renderPlot({
       x <- get_cmatrix_and_genres(scraped_data = scraped_data())$goodreads_read
       tidied <- tidy_the_books(read_books_data = x)
-      get_bing_plot(tidied)
+      get_bing_plot(tidied_books = tidied,pal = bookpal)
    })
    
    output$timeplot <- renderPlot({
