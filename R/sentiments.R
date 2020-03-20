@@ -30,15 +30,18 @@ tidy_the_books <- function(read_books_data){
 
 #tidy_the_books(read_books_data)
 
-getnbooks <- function(tidied_books){
-  nbooks <- tidy_books %>%
+# getnbooks <- function(tidied_books){
+#   nbooks <- tidied_books %>%
+#     group_by(year_read) %>%
+#     summarize(nbooks = length(unique(title))) 
+#   return(nbooks)
+# }
+
+get_bing_plot <- function(tidied_books,pal){
+  nbooks <- tidied_books %>%
     group_by(year_read) %>%
     summarize(nbooks = length(unique(title))) 
-  return(nbooks)
-}
-
-get_bing_plot <- function(tidied_books){
-  word_bing <- tidy_books %>%
+  word_bing <- tidied_books %>%
     inner_join(get_sentiments("bing"), by = "word") %>%
     group_by(year_read,sentiment) %>%
     summarize(n = length(sentiment)) %>%
@@ -51,7 +54,7 @@ get_bing_plot <- function(tidied_books){
     geom_hline(yintercept = 0,lty=2,colour='darkgrey')+
     geom_col(lwd=0.6,colour = 'darkgrey') +
     scale_fill_manual('Bing sentiment score',
-                      values = bookpal[c(5,3)]) + 
+                      values = pal[c(5,3)]) + 
     xlab('Year') +
     ylab('Word positivity') +
     ggsidekick::theme_sleek(base_size = 12)
@@ -59,15 +62,16 @@ get_bing_plot <- function(tidied_books){
 }
 
 get_word_table <- function(tidied_books){
-  tidy_book_words <- tidy_books %>%
+  tidy_book_words <- tidied_books %>%
     group_by(year_read,word) %>%
     count(word, sort = TRUE)
   # most frequent words in descriptions of your books
   return(tidy_book_words) # NOTE: show this as a cute kable table
 }
-  
+
 get_AFINN_plot <- function(tidied_books){
- data(sentiments)
+  data(sentiments)
+  tidy_book_words <- get_word_table(tidied_books)
   word_sentiments <- tidy_book_words %>%
     inner_join(get_sentiments("afinn"), by = "word") 
   word_sentiments
