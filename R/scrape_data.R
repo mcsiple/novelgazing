@@ -8,11 +8,9 @@
 # library(lubridate)
 # library(curl) #for id'ing agent to server
 # 
-
-
-#usernumber <- 8200244
-#username <- 'megsie'
-#startUrl <- paste('https://www.goodreads.com/review/list/',usernumber,'-',username,sep='')
+# usernumber <- 8200244
+# username <- 'megsie'
+# startUrl <- paste('https://www.goodreads.com/review/list/',usernumber,'-',username,sep='')
 
 # function to get book descriptions
 getBookDescription <- function(bookLink) {
@@ -22,6 +20,7 @@ getBookDescription <- function(bookLink) {
     html_text() %>%
     trimws()
 }
+
 
 # function to get book genres
 get_genres <- function(bookLink){
@@ -60,6 +59,12 @@ get_books <- function(i) {
   bookGenre <- bookLinks %>%
     map(get_genres)
   
+  monthRead <- html %>% # mcs
+    html_nodes(".date_read_value") %>%
+    html_text(trim = TRUE) %>%
+    mdy() %>%
+    month()
+    
   yearRead1 <- html %>% # mcs
     html_nodes(".date_read_value") %>%
     html_text(trim = TRUE) %>%
@@ -86,12 +91,13 @@ get_books <- function(i) {
       author = author,
       book_description = bookDescription,
       book_genres = bookGenre,
-      year_read = yearRead
+      year_read = yearRead,
+      month_read = monthRead
     )
   )
 }
 
-getnbooks <- function(){
+getnbooks <- function(stUrl=startUrl){
   url <- str_c(startUrl, "?page=", 1, "&shelf=read")
   html <- read_html(url)
   nbooks <- html %>%
@@ -104,7 +110,7 @@ getnbooks <- function(){
 
 # get books (this takes a while!)
 #(npages_in <- ceiling(getnbooks()/30) ) # 30 entries per page
-
+# This function is in operation, it's just now in the app instead of as a separate function
 # scrape_goodreads <- function(npages){
 #   goodreads <- map_df(1:npages, ~{
 #     Sys.sleep(5) # don't timeout the goodreads server
@@ -121,13 +127,20 @@ get_cmatrix_and_genres <- function(scraped_data){
     select(-book_genres)
   #write_csv(path = here('output',
   #                      'goodreads_read.csv'))
+  
   # save genre data
   genres <- goodreads %>%
     select(book_genres,year_read) %>%
     mutate(id = 1:n()) %>%
     unnest_longer(book_genres)
   
-  # Turn genres into 'community matrix'
+  # save genres by month
+  genres_month <- goodreads %>%
+    select(book_genres,month_read) %>%
+    mutate(id = 1:n()) %>%
+    unnest_longer(book_genres)
+  
+  # Turn genres by year into 'community matrix'
   community <-  genres %>% 
     pivot_longer(c(-id,-year_read)) %>% 
     dplyr::count(year_read, value) %>% # to give each book its own diversity, change to dplyr::count(id, value)
@@ -139,9 +152,8 @@ get_cmatrix_and_genres <- function(scraped_data){
     as.data.frame()
   return(list(community = community,
               genres = genres,
+              genres_month = genres_month,
               goodreads_read = goodreads_read))
 }
-#write_csv(community, path = here('output','communitymatrix.csv'))
-
 
 
