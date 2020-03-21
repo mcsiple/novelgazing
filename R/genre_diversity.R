@@ -66,16 +66,12 @@ get_rainbow_plot <- function(scraped_data,pal,whichplot){
   }else{
     return(rainbowbeauty_mo)
   }
-  
 }
 
 #scrape <- scrape_goodreads(npages = 1) #time-consuming
 #g <- get_cmatrix_and_genres(scraped_data = scrape)$genres
 #bookpal <- c("#ff7506", "#00eaff", "#ffdf06", "#ffee7d", "#ff2673", "#7df4ff") 
 #get_rainbow_plot(scraped_data = scrape,pal = bookpal,whichplot = 'yearly')  
-
-
-
 
 
 library(here)
@@ -94,33 +90,61 @@ get_divplot <- function(community){
                      div = diversity(cmatrix[,-1]))
   cmatrix <- as.matrix(community)
   divs %>%
-  ggplot(aes(year,div)) +
-  geom_point(size=3) +
-  geom_line() +
-  ylab('Shannon diversity (H)') +
-  xlab('Year') +
-  labs(#title = 'Genre diversity',
-       caption = 'Data: Goodreads') +
-  ggsidekick::theme_sleek(base_size = 14)
+    ggplot(aes(year,div)) +
+    geom_point(size=3) +
+    geom_line() +
+    ylab('Shannon diversity (H)') +
+    xlab('Year') +
+    labs(#title = 'Genre diversity',
+      caption = 'Data: Goodreads') +
+    ggsidekick::theme_sleek(base_size = 14)
+}
 
-  }
+
+
+get_rarefaction <- function(community,pal){  
+  cmatrix <- as.matrix(community)
+  year <- cmatrix[,1]
+  sa <- specaccum(cmatrix[,-1])
+  my.res <- with(sa, data.frame(sites, richness, sd)) %>%
+    mutate(year = cmatrix[,1]) %>%
+    mutate(loSD = richness - sd,
+           hiSD = richness + sd) 
+  head(my.res)
   
-sa <- specaccum(cmatrix[,-1])
+  plt <- my.res %>% 
+    ggplot(aes(year,richness)) +
+    geom_ribbon(aes(ymin=loSD,ymax=hiSD),alpha=0.6, fill = pal[4]) +
+    geom_line(colour = pal[3],lwd=1.2) +
+    scale_x_continuous() +
+    ylab('Genre richness') +
+    xlab('Year') +
+    ggsidekick::theme_sleek(base_size=14) +
+    labs(caption = 'Richness +/- 1 SD')
+  return(plt)
+}
+
 plot(sa)
 
 # What I want to do: an NMDS plot of all the books (each point = 1 yr??) showing the topics as arrows on top to show which ones are due to the biggest difference between years
-mds <- metaMDS(cmatrix[,-1])
-ord <- mds$points %>%
-  as.data.frame()
+get_mds <- function(community,pal){
+  cmatrix <-  as.matrix(community)
+  year <- cmatrix[,1]
+  mds <- metaMDS(cmatrix[,-1])
+  ord <- mds$points %>%
+    as.data.frame()
+  
+  ordplot <- ord %>% 
+            add_column(year,group=1) %>%
+            mutate(year = as.integer(year)) %>%
+            filter(!is.na(year)) %>%
+            ggplot(aes(MDS1,MDS2,color = year)) +
+            geom_point(size=3) +
+            scale_colour_viridis_c(option='plasma') +
+            ggsidekick::theme_sleek(base_size=14)
+  return(ordplot)
+}
 
-ord %>% 
-  add_column(year,group=1) %>%
-  filter(!is.na(year)) %>%
-  ggplot(aes(MDS1,MDS2,colour = year,group = group)) +
-  geom_point(size=3) +
-  scale_colour_viridis_c(option='plasma') +
-  geom_line() +
-  ggpomological::theme_pomological(base_size=16)
 
 data(varespec)
 data(varechem)
