@@ -31,9 +31,9 @@ get_genres <- function(bookLink){
 }
 
 # function to get books
-get_books <- function(i) {
+get_books <- function(i,stUrl) {
   #cat(i, "\n")
-  url <- str_c(startUrl, "?page=", i, "&shelf=read")
+  url <- str_c(stUrl, "?page=", i, "&shelf=read")
   
   #html <- read_html(url)
   html <- read_html(curl(url,handle = curl::new_handle("useragent" = "Mozilla/5.0")))
@@ -98,7 +98,7 @@ get_books <- function(i) {
 }
 
 getnbooks <- function(stUrl=startUrl){
-  url <- str_c(startUrl, "?page=", 1, "&shelf=read")
+  url <- str_c(stUrl, "?page=", 1, "&shelf=read")
   html <- read_html(url)
   nbooks <- html %>%
     html_nodes('title') %>%

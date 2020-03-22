@@ -8,6 +8,8 @@ library(lubridate)
 library(curl) #for id'ing agent to server
 library(snakecase)
 library(tidytext) #for sentiment analysis
+library(vegan) # for ecology tab
+library(kableExtra)
 
 
 source(here::here('R','cleanup_csv.R'))
@@ -95,7 +97,13 @@ ui <- navbarPage('Novel-gazing',
                          tableOutput('scraped'),
                   p('Now you can look at some more fun patterns in the descriptions of your books.'),
                   br(),
-                  plotOutput('sentiments')
+                  fluidRow(column(8,
+                                  plotOutput('sentiments')
+                                  ),
+                           column(4,
+                                  p('The top 10 most common words in your book descriptions'),
+                                  tableOutput('keywords'))),
+                  plotOutput('afinn')
                          )
              )),
   
@@ -157,22 +165,25 @@ server <- function(input, output) {
    })
    
    scraped_data <- eventReactive(input$go,{
-       # Re-run when button is clicked
+      # Re-run when button is clicked
       #usernumber <- '8200244'
       #username <- 'megsie'
       usernumber <- input$userid
       username <- input$username
       startUrl <- paste('https://www.goodreads.com/review/list/',usernumber,'-',username,sep='')
       #startUrl <- "https://www.goodreads.com/review/list/8200244-megsie"
+      print(startUrl)
       withProgress(message = 'Scraping your reading data', value = 0, {
+         
          n = ceiling(getnbooks(stUrl=startUrl)/30) 
+         print(startUrl)
          print(n)
-         n=1
+         n=1 #for testing!!!
          goodreads <- map_df(1:n, ~{
             Sys.sleep(6) # don't timeout the goodreads server
             #cat(.x)
             incProgress(1/n, detail = paste("Extracting page", .x))
-            get_books(.x)
+            get_books(.x,stUrl = startUrl)
          })
       })
       goodreads
@@ -181,12 +192,6 @@ server <- function(input, output) {
    output$scraped <- renderTable({
       goodreads <- scraped_data()
       (head(goodreads[,1:2]))
-   })
-  
-   output$sentiments <- renderPlot({
-      x <- get_cmatrix_and_genres(scraped_data = scraped_data())$goodreads_read
-      tidied <- tidy_the_books(read_books_data = x)
-      get_bing_plot(tidied_books = tidied,pal = bookpal)
    })
    
    output$timeplot <- renderPlot({
@@ -204,7 +209,37 @@ server <- function(input, output) {
          HTML(paste(textout))
       }
    })
+   
+
+# Scraped data and sentiments
+   output$sentiments <- renderPlot({
+      x <- get_cmatrix_and_genres(scraped_data = scraped_data())$goodreads_read
+      tidied <- tidy_the_books(read_books_data = x)
+      get_bing_plot(tidied_books = tidied,pal = bookpal)
+   })
+   
+   output$afinn <- renderPlot({
+      x <- get_cmatrix_and_genres(scraped_data = scraped_data())$goodreads_read
+      tidied <- tidy_the_books(read_books_data = x)
+      get_AFINN_plot(tidied_books = tidied)
+   })
+   
+   output$keywords <- function(){ 
+      x <- get_cmatrix_and_genres(scraped_data = scraped_data())$goodreads_read
+      tidied <- tidy_the_books(read_books_data = x)
+      df <- get_word_table(tidied_books = tidied) %>%
+      rename('Year read'=year_read,
+             'Word'=word,
+             'Number of times this word appears in your read shelf'=n) %>%
+         as.data.frame() 
+      df <- df[1:10,]
+      
+      kable(df) %>%
+         kable_styling("striped", full_width = F) 
+      }
 }
+
+
 
 # Run the application 
 shinyApp(ui = ui, server = server)
