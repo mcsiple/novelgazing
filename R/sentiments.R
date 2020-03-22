@@ -53,10 +53,11 @@ get_bing_plot <- function(tidied_books,pal){
     ggplot(aes(year_read,n_scaled,fill = sentiment)) +
     geom_hline(yintercept = 0,lty=2,colour='darkgrey')+
     geom_col(lwd=0.6,colour = 'darkgrey') +
-    scale_fill_manual('Bing sentiment score',
+    scale_fill_manual('',
                       values = pal[c(5,3)]) + 
     xlab('Year') +
     ylab('Word positivity') +
+    #labs(title ='Bing sentiment score'),
     ggsidekick::theme_sleek(base_size = 14) +
     theme(legend.position = 'bottom')
   return(bp)
@@ -92,4 +93,4 @@ get_AFINN_plot <- function(tidied_books){
   return(afinnplot)
 }
 
-get_AFINN_plot(tidied_books = tidied)
+#get_AFINN_plot(tidied_books = tidied)

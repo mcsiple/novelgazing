@@ -28,7 +28,7 @@ get_rainbow_plot <- function(scraped_data,pal,whichplot){
   rainbowbeauty <- pdat %>% 
     ggplot(aes(year_read,total,fill=simple_genre)) + 
     geom_col() +
-    scale_fill_manual(values = mycolors) +
+    scale_fill_manual('',values = mycolors) +
     xlab('Year') +
     ylab('Total count among books you finished') +
     ggsidekick::theme_sleek(base_size = 14) +
@@ -54,7 +54,7 @@ get_rainbow_plot <- function(scraped_data,pal,whichplot){
   rainbowbeauty_mo <- pdat2 %>% 
     ggplot(aes(month_read,total,fill=simple_genre)) + 
     geom_col() +
-    scale_fill_manual(values = mycolors) +
+    scale_fill_manual('',values = mycolors) +
     scale_x_continuous(breaks = 1:12,labels = month.abb) +
     xlab('Month') +
     ylab('Total count among books you finished') +
@@ -74,14 +74,14 @@ get_rainbow_plot <- function(scraped_data,pal,whichplot){
 #get_rainbow_plot(scraped_data = scrape,pal = bookpal,whichplot = 'yearly')  
 
 
-library(here)
-community <- read.csv(here('output','communitymatrix.csv'),header = T)
-cmatrix <- as.matrix(community)
-library(vegan)
+#library(here)
+#community <- read.csv(here('output','communitymatrix.csv'),header = T)
+#cmatrix <- as.matrix(community)
+#library(vegan)
 
-year <- cmatrix[,1]
-divs <- data.frame(year = year,
-                   div = diversity(cmatrix[,-1]))
+#year <- cmatrix[,1]
+#divs <- data.frame(year = year,
+#                   div = diversity(cmatrix[,-1]))
 
 get_divplot <- function(community){
   cmatrix <- as.matrix(community)
@@ -89,7 +89,7 @@ get_divplot <- function(community){
   divs <- data.frame(year = year,
                      div = diversity(cmatrix[,-1]))
   cmatrix <- as.matrix(community)
-  divs %>%
+  divplot <- divs %>%
     ggplot(aes(year,div)) +
     geom_point(size=3) +
     geom_line() +
@@ -98,6 +98,7 @@ get_divplot <- function(community){
     labs(#title = 'Genre diversity',
       caption = 'Data: Goodreads') +
     ggsidekick::theme_sleek(base_size = 14)
+  return(divplot)
 }
 
 
@@ -124,28 +125,40 @@ get_rarefaction <- function(community,pal){
   return(plt)
 }
 
-plot(sa)
 
-# What I want to do: an NMDS plot of all the books (each point = 1 yr??) showing the topics as arrows on top to show which ones are due to the biggest difference between years
+
+# What I want to do: an NMDS plot of all the books. But I have nixed it because NMDS is hard to interpret and is randomized so will look different every time (thus, hard to to interpret!)
 get_mds <- function(community,pal){
   cmatrix <-  as.matrix(community)
   year <- cmatrix[,1]
-  mds <- metaMDS(cmatrix[,-1])
+  mds.log <- log(cmatrix[,-1]+1)
+  sol <- metaMDS(mds.log)
+  vec.sp <- envfit(sol$points, mds.log, perm=1000)
+  vec.sp.df <- as.data.frame(vec.sp$vectors$arrows*sqrt(vec.sp$vectors$r))
+  vec.sp.df$species <- rownames(vec.sp.df)
+  vec.sp.df.tp <- vec.sp.df
   ord <- mds$points %>%
-    as.data.frame()
+    as.data.frame() %>%
+    add_column(year,group=1) %>%
+    mutate(year = as.integer(year)) 
   
-  ordplot <- ord %>% 
-            add_column(year,group=1) %>%
-            mutate(year = as.integer(year)) %>%
-            filter(!is.na(year)) %>%
-            ggplot(aes(MDS1,MDS2,color = year)) +
-            geom_point(size=3) +
-            scale_colour_viridis_c(option='plasma') +
-            ggsidekick::theme_sleek(base_size=14)
+  ordplot <- 
+    ord %>% filter(!is.na(year)) %>%
+    ggplot(aes(MDS1,MDS2,color = year,group = factor(group))) +
+    geom_point(size=4) +
+    geom_path() +
+    scale_colour_gradient(low = pal[2],high = pal[3])+
+    geom_segment(data=vec.sp.df.tp,
+                 aes(x=0,xend=MDS1,y=0,yend=MDS2),
+                 inherit.aes = FALSE,
+                 arrow = arrow(length = unit(0.5, "cm")),
+                 colour="grey") + 
+    geom_text(data=vec.sp.df.tp,
+              aes(x=MDS1,y=MDS2,label=species),
+              inherit.aes = FALSE,size=5) +
+    ggsidekick::theme_sleek(base_size=14)
+  ordplot
+  
   return(ordplot)
 }
 
-
-data(varespec)
-data(varechem)
-ord <- metaMDS(varespec)
