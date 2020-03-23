@@ -11,6 +11,8 @@
 # usernumber <- 8200244
 # username <- 'megsie'
 # startUrl <- paste('https://www.goodreads.com/review/list/',usernumber,'-',username,sep='')
+# startUrl <- paste('https://www.goodreads.com/review/list/','29005117','-','federico-dn',sep='')
+
 
 # function to get book descriptions
 getBookDescription <- function(bookLink) {
@@ -59,31 +61,81 @@ get_books <- function(i,stUrl) {
   bookGenre <- bookLinks %>%
     map(get_genres)
   
-  monthRead <- html %>% # mcs
-    html_nodes(".date_read_value") %>%
-    html_text(trim = TRUE) %>%
-    mdy() %>%
-    month()
-    
-  yearRead1 <- html %>% # mcs
-    html_nodes(".date_read_value") %>%
-    html_text(trim = TRUE) %>%
-    mdy() %>%
-    year()
-  
-  yearRead2 <- html %>% 
-    html_nodes(".date_read") %>%
-    map_df(~list(date_read = html_nodes(.x, '.date_read_value') %>% 
+  yearRead <- html %>%
+    html_nodes('.date_read') %>%
+    map_df(~list(date_read = html_nodes(.x, '.date_row') %>% 
                    html_text(trim = TRUE) %>% 
-                   {if(length(.) == 0) NA else .})) %>%  #Christine genius
-    slice(2:n()) %>% 
+                   {if(length(.) > 1) extract2(.,1) else .} %>%
+                   str_replace_all(., 'not set', NA_character_))) %>%
     mutate(newdate = mdy(date_read),
            year = year(newdate)) %>%
     select(year)
+    
+  monthRead <- html %>%
+    html_nodes('.date_read') %>%
+    map_df(~list(date_read = html_nodes(.x, '.date_row') %>% 
+                   html_text(trim = TRUE) %>% 
+                   {if(length(.) > 1) extract2(.,1) else .} %>%
+                   str_replace_all(., 'not set', NA_character_)))%>%
+    mutate(newdate = mdy(date_read),
+           month = month(newdate)) %>%
+    select(month)
   
-  if(length(yearRead1)==length(author)){
-    yearRead = yearRead1}else{
-      yearRead = yearRead2$year}
+  #sometimes there are NA years and you have to do these hijinx
+  # yearRead1 <- html %>% # mcs
+  #   html_nodes(".date_read_value") %>%
+  #   html_text(trim = TRUE) %>%
+  #   mdy() %>%
+  #   year()
+  # 
+  # nodes_megsie <- function(x){
+  #   y <- html.nodes(x,'.date_read_value') 
+  # }
+  # 
+  # yearRead2 <- html %>% 
+  #   html_nodes(".date_read") %>%
+  #   map_df(~list(date_read = html_nodes(.x, '.date_read_value') %>% 
+  #                  html_text(trim = TRUE) %>% 
+  #                  {if(length(.) == 0) NA else .})) %>%  #Christine genius
+  #   slice(2:n()) %>% 
+  #   mutate(newdate = mdy(date_read),
+  #          year = year(newdate)) %>%
+  #   select(year)
+  # 
+  # if(length(yearRead1)==length(author)){
+  #   yearRead = yearRead1}else{
+  #     yearRead = yearRead2$year}
+  # 
+  # monthRead <- html %>% # mcs
+  #   html_nodes(".date_read_value") %>%
+  #   html_text(trim = TRUE) %>%
+  #   mdy() %>%
+  #   month()
+  # 
+  # monthRead1 <- html %>% # mcs
+  #   html_nodes(".date_read_value") %>%
+  #   html_text(trim = TRUE) %>%
+  #   mdy() %>%
+  #   month()
+  # 
+  # monthRead2 <- html %>% 
+  #   html_nodes(".date_read") %>%
+  #   map_df(~list(date_read = html_nodes(.x, '.date_read_value') %>% 
+  #                 # magrittr::extract2(1) %>%
+  #                  html_text(trim = TRUE) %>% 
+  #                  {if(length(.) == 0) NA else .})) %>%  #Christine genius
+  #   slice(2:n()) %>% 
+  #   mutate(newdate = mdy(date_read),
+  #          month = month(newdate)) %>%
+  #   select(month)
+  # 
+  # if(length(monthRead1)==length(author)){
+  #   monthRead = monthRead1}else{
+  #     monthRead = monthRead2$month}
+  
+#print(yearRead)
+#print(monthRead)
+#print(author)
   
   return(
     tibble(
@@ -93,7 +145,7 @@ get_books <- function(i,stUrl) {
       book_genres = bookGenre,
       year_read = yearRead,
       month_read = monthRead
-    )
+  )
   )
 }
 
@@ -109,16 +161,16 @@ getnbooks <- function(stUrl=startUrl){
 }
 
 # get books (this takes a while!)
-#(npages_in <- ceiling(getnbooks()/30) ) # 30 entries per page
+#(npages_in <- ceiling(getnbooks(stUrl = startUrl)/30) ) # 30 entries per page
 # This function is in operation, it's just now in the app instead of as a separate function
-# scrape_goodreads <- function(npages){
-#   goodreads <- map_df(1:npages, ~{
-#     Sys.sleep(5) # don't timeout the goodreads server
-#     cat(.x)
-#     get_books(.x)
-#   })
-#   return(goodreads)
-# }
+scrape_goodreads <- function(npages = npages_in){
+  goodreads <- map_df(1:npages, ~{
+    Sys.sleep(5) # don't timeout the goodreads server
+    cat(.x)
+    get_books(.x,stUrl = startUrl)
+  })
+  return(goodreads)
+}
 
 # get big fun matrix for further analysis
 get_cmatrix_and_genres <- function(scraped_data){

@@ -10,6 +10,7 @@ library(snakecase)
 library(tidytext) #for sentiment analysis
 library(vegan) # for ecology tab
 library(kableExtra)
+library(magrittr)
 
 
 source(here::here('R','cleanup_csv.R'))
@@ -85,13 +86,14 @@ ui <- navbarPage('Novel-gazing',
                           ,
                           sidebarLayout(
                              sidebarPanel(
-                                h4('Enter your Goodreads user info'),
-                                p('Enter your goodreads user id and username. You can find them in the URL for your Goodreads account. Your account must be public to do this part.'),
-                                textInput(inputId = "userid",label = "User ID",placeholder = "Enter your user ID"),
+                                h4('Enter your Goodreads info'),
+                                p('You can find this info in the URL for your Goodreads account. Your account must be public to do this part.'),
+                                textInput(inputId = "userid",label = "User ID",placeholder = "Enter your user ID number"),
                                 textInput(inputId = "username",label = "User name",placeholder = "Enter your user name"),
                                 p('NOTE: This will take a LONG time (~3 mins per page) so go get a coffee after you enter your info and click the button.'),
+                                checkboxInput('hurry',label = 'I am in a hurry- just scrape the first page of results',value = TRUE),
                                 actionButton("go", "Get my data!", icon("book", lib = "glyphicon","fa-2x"),
-                                             style="color: #fff; background-color: #ff7506; border-color: #ff7506")
+                                             style="color: #fff; background-color: #ff7506; border-color: #ff7506"),
                              ),
                              mainPanel(
                                 h4('A glimpse of the scraped data'),
@@ -189,9 +191,9 @@ server <- function(input, output) {
          n = ceiling(getnbooks(stUrl=startUrl)/30) 
          print(startUrl)
          print(n)
-         n=1 #for testing!!!
+         if(input$hurry) {n = 1}
          goodreads <- map_df(1:n, ~{
-            Sys.sleep(6) # don't timeout the goodreads server
+            Sys.sleep(5) # don't timeout the goodreads server
             #cat(.x)
             incProgress(1/n, detail = paste("Extracting page", .x))
             get_books(.x,stUrl = startUrl)
