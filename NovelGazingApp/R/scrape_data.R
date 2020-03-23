@@ -2,12 +2,12 @@
 # https://maraaverick.rbind.io/2017/10/goodreads-part-2/
 # I added a few pieces of info including the 'community matrix'
 
-library(tidyverse)
-library(stringr)
-library(rvest) # for cool html stuff
-library(lubridate)
-library(curl) #for id'ing agent to server
-library(magrittr)
+# library(tidyverse)
+# library(stringr)
+# library(rvest) # for cool html stuff
+# library(lubridate)
+# library(curl) #for id'ing agent to server
+# library(magrittr)
 
 #usernumber <- 8200244
 #username <- 'megsie'
