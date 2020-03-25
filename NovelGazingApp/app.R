@@ -1,24 +1,34 @@
-
+# Libraries ---------------------------------------------------------------
 library(shiny)
 library(shinythemes)
 library(tidyverse)
 library(stringr)
-library(rvest) # for cool html stuff
+library(textdata)
+library(rvest) # webscrape stuff
+library(httr)
+library(magrittr) # more webscraping
 library(lubridate)
 library(curl) #for id'ing agent to server
 library(snakecase)
+library(reshape2)
+library(patchwork)
 library(tidytext) #for sentiment analysis
-library(vegan) # for ecology tab
-library(kableExtra)
-library(magrittr)
+library(vegan) # for ecology measures
+library(kableExtra) # for nice tables
 
-
+# Functions ---------------------------------------------------------------
 source(here::here('R','cleanup_csv.R'))
 source(here::here('R','basic_diagnostics.R'))
 source(here::here('R','scrape_data.R'))
 source(here::here('R','sentiments.R'))
 source(here::here('R','jumbotron2.R'))
 source(here::here('R','genre_diversity.R'))
+
+
+# Data --------------------------------------------------------------------
+load(here::here('R','AFINNdat.RData')) #afinn_man
+
+
 # Aesthetics --------------------------------------------------------------
 bookpal <- c('#ff7506', #dark orange
              '#00eaff', #(cyan)
@@ -27,22 +37,28 @@ bookpal <- c('#ff7506', #dark orange
              '#ff2673', #(magenta)
              '#7df4ff') #(light cyan)
 
-# Functions ---------------------------------------------------------------
-
-
-
 # ui ----------------------------------------------------------------------
 ui <- navbarPage('Novel-gazing',
                  theme = shinytheme("yeti"),
                  tabPanel("Home",
-                          fluidPage(column(9, 
+                          fluidRow(column(9, 
                                            br(),
                                            br(),
                                            br(),
                                            jumbotron2("Welcome to Novel-gazing", "This app takes your reading data from Goodreads and shows you a bunch of fun diagnostics. It is a labor of love.",button=FALSE)),
                                     column(1,
-                                           imageOutput('preImageLarge',inline = TRUE))
-                          )),
+                                           imageOutput('preImageLarge',inline = TRUE))),
+                                    fluidRow(column(12,
+                                           h5('Built with',
+                                              img(src = 'https://www.rstudio.com/wp-content/uploads/2014/04/shiny.png', height = '30px'),
+                                              'in',
+                                              img(src = 'https://www.rstudio.com/wp-content/uploads/2014/07/RStudio-Logo-Blue-Gray.png', height = '30px'),
+                                              'using the',
+                                              img(src = 'https://s.gr-assets.com/assets/icons/goodreads_icon_100x100-4a7d81b31d932cfc0be621ee15a14e70.png', height = '30px'),
+                                              'Goodreads API.'),
+                                           h6('By Megsie Siple'),
+                                           h6('Illustrations by Ashley Siple')))
+                          ),
                  tabPanel("1. Your books",
                           # Sidebar with a slider input for number of bins 
                           sidebarLayout(
@@ -96,6 +112,10 @@ ui <- navbarPage('Novel-gazing',
                                              style="color: #fff; background-color: #ff7506; border-color: #ff7506"),
                              ),
                              mainPanel(
+                                h4('How to find your user ID and username'),
+                                p('If you go to your user profile on goodreads, your user ID and username are in the URL above.'),
+                                imageOutput(outputId = 'HowToScrape',inline = TRUE),
+                                br(),
                                 h4('A glimpse of the scraped data'),
                                 tableOutput('scraped'),
                                 p('Now you can look at some more fun patterns in the descriptions of your books.'),
@@ -112,12 +132,18 @@ ui <- navbarPage('Novel-gazing',
                              ))),
                  
                  tabPanel("4. The ecology of your bookshelf",
-                          h3('How diverse is your reading?'),
-                          p('Once you have successfully webscraped your data, you can look at it like we would an ecological community. How diverse are the genres you read? How has the richness of your reading changed over time?'),
+                          #textOutput('test'),
+                          h3('How has the community on your bookshelf changed over time?'),
+                          p('Once you have successfully webscraped your data, you can look at it like we would an ecological community. How diverse are the genres you read? Do you read more of certain genres in specific seasons?'),
+                          br(),
+                          h4('The composition of your read shelf over time'),
                           fluidRow(column(5,
                                           plotOutput('rainbow_yr')),
                                    column(7,
                                           plotOutput('rainbow_month'))),
+                          br(),
+                          h4('Diversity and genre richness'),
+                          p('We can apply some community ecology methods to your bookshelf to ask questions like, how diverse is your reading? The plot on the left shows a common diversity index, Shannon diversity. The plot on the right shows a rarefaction curve. If it has plateaued, you have leveled out in terms of genres you tend to read (we use this in ecology to estimate whether the samples (on the x axis) have adequately characterized the community.'),
                           fluidRow(column(6,
                                           plotOutput('diversity')),
                                    column(6,
@@ -127,11 +153,12 @@ ui <- navbarPage('Novel-gazing',
 
 
 
-# Server ------------------------------------------------------------------
+# server ------------------------------------------------------------------
 server <- function(input, output) {
    # Image
    output$preImage <- renderImage({
-      filename <- normalizePath(here::here('NovelGazingApp','images','book_logo.png'))
+      #filename <- normalizePath(here::here('NovelGazingApp','images','book_logo.png'))
+      filename <- normalizePath(here::here('www','book_logo.png'))
       list(src = filename,
            alt = 'test',
            width = 240,
@@ -139,19 +166,29 @@ server <- function(input, output) {
    }, deleteFile = FALSE)
    
    output$preImageLarge <- renderImage({
-      filename <- normalizePath(here::here('NovelGazingApp','images','book_logo_long.png'))
+      #filename <- normalizePath(here::here('NovelGazingApp','images','book_logo_long.png'))
+      filename <- normalizePath(here::here('www','book_logo_long.png'))
       list(src = filename,
            alt = 'test',
            width = 200)
    }, deleteFile = FALSE)
    
    output$HowToAll <- renderImage({
-      filename <- normalizePath(here::here('NovelGazingApp','images','HowToAll.png'))
+      #filename <- normalizePath(here::here('NovelGazingApp','images','HowToAll.png'))
+      filename <- normalizePath(here::here('www','HowToAll.png'))
       list(src = filename,
            alt = 'ht1',
            width = 600)
    }, deleteFile = FALSE)
    
+   
+   output$HowToScrape <- renderImage({
+      #filename <- normalizePath(here::here('NovelGazingApp','images','HowToAll.png'))
+      filename <- normalizePath(here::here('www','HowToScrape.png'))
+      list(src = filename,
+           alt = 'hts',
+           width = 600)
+   }, deleteFile = FALSE)
    
    # Raw data
    rawdatafile <- reactive({
@@ -183,7 +220,7 @@ server <- function(input, output) {
       #username <- 'megsie'
       usernumber <- input$userid
       username <- input$username
-      startUrl <- paste('https://www.goodreads.com/review/list/',usernumber,'-',username,sep='')
+      startUrl <- paste('http://www.goodreads.com/review/list/',usernumber,'-',username,sep='')
       #startUrl <- "https://www.goodreads.com/review/list/8200244-megsie"
       #print(startUrl)
       withProgress(message = 'Scraping your reading data', value = 0, {
@@ -195,7 +232,7 @@ server <- function(input, output) {
          goodreads <- map_df(1:n, ~{
             Sys.sleep(5) # don't timeout the goodreads server
             #cat(.x)
-            incProgress(1/n, detail = paste("Extracting page", .x))
+            incProgress(1/n, detail = paste("Extracting page", .x,"of",n))
             get_books(.x,stUrl = startUrl)
          })
       })
@@ -234,7 +271,8 @@ server <- function(input, output) {
    output$afinn <- renderPlot({
       x <- get_cmatrix_and_genres(scraped_data = scraped_data())$goodreads_read
       tidied <- tidy_the_books(read_books_data = x)
-      get_AFINN_plot(tidied_books = tidied)
+      # silly workaround (sorry 2 me)
+      get_AFINN_plot(tidied_books = tidied,afinnsentiments = afinn_man)
    })
    
    output$keywords <- function(){ 
@@ -268,9 +306,16 @@ server <- function(input, output) {
       x <- get_cmatrix_and_genres(scraped_data = scraped_data())$community
       get_rarefaction(community = x,pal = bookpal)
    })
+   
+   output$test <- renderText({
+      if(is.null(rawdatafile())){NULL}else{
+         plotdat <- cleanup_csv(rawdatafile())
+      x <- get_genre(cleaned_books = plotdat,i = 1)
+      paste(x)
+      }
+   })
+
 }
-
-
 
 # Run the application 
 shinyApp(ui = ui, server = server)
