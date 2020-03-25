@@ -1,13 +1,13 @@
 # basic_diagnostics
 # For basic page, take csv data and produce:
 
-library(lubridate)
-library(here)
-library(tidyverse)
-library(ggpomological)
-library(reshape2)
-library(snakecase)
-library(patchwork)
+#library(lubridate)
+#library(here)
+#library(tidyverse)
+#library(ggpomological)
+#library(reshape2)
+#library(snakecase)
+#library(patchwork)
 
 # Load your own user data separately
 #testfile <- here::here('data','goodreads_library_export.csv')
@@ -116,12 +116,14 @@ time_to_finish_shelves <- function(cleaned_csv = cleaned_csv1,
   nyears_to_finish <- n2read/bpy
   
   #Plot 
-  ibp <- read_books %>%
+  plotdat <- read_books %>%
     filter(exclusive_shelf == 'read') %>%
     mutate(ttr = year_read - year_added) %>%
     mutate(title = fct_reorder(title, ttr, max, .desc = TRUE)) %>%
     top_n(6) %>%
-    arrange(desc(-ttr)) %>%
+    arrange(desc(-ttr)) 
+  
+  ibp <- plotdat %>%
     ggplot(aes(title,ttr)) +
     geom_col(fill = pal[1]) +
     ggsidekick::theme_sleek(base_size = 16) +
@@ -129,6 +131,9 @@ time_to_finish_shelves <- function(cleaned_csv = cleaned_csv1,
     xlab("Books you waited longest to read") +
     ylab("Years between adding the book \nto your shelf and reading it") +
     coord_flip()
+  
+ # if(all(is.na(plotdat$ttr))){ibp <- ibp + annotate()}
+  
     
   return(list(nyears_to_finish = nyears_to_finish,
               ind_books_plot = ibp))
