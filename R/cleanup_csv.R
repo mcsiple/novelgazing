@@ -23,6 +23,7 @@ cleanup_csv <- function(my_books){
     mutate(isbn = as.character(isbn)) %>%
     mutate(date_read = ymd(date_read),
            year_read = year(date_read),
+           month_read = month(date_read),
            date_added = ymd(date_added),
            year_added = year(date_added))
   return(read_books)
