@@ -7,10 +7,11 @@
 # library(rvest) # for cool html stuff
 # library(lubridate)
 # library(curl) #for id'ing agent to server
-# 
-# usernumber <- 8200244
-# username <- 'megsie'
-# startUrl <- paste('https://www.goodreads.com/review/list/',usernumber,'-',username,sep='')
+# library(magrittr)
+
+#usernumber <- 8200244
+#username <- 'megsie'
+#startUrl <- paste('https://www.goodreads.com/review/list/',usernumber,'-',username,sep='')
 # startUrl <- paste('https://www.goodreads.com/review/list/','29005117','-','federico-dn',sep='')
 
 
@@ -36,9 +37,10 @@ get_genres <- function(bookLink){
 get_books <- function(i,stUrl) {
   #cat(i, "\n")
   url <- str_c(stUrl, "?page=", i, "&shelf=read")
-  
+  # NOTE: This reads from DATE ADDED not date finished!
   #html <- read_html(url)
   html <- read_html(curl(url,handle = curl::new_handle("useragent" = "Mozilla/5.0")))
+  
   title <- html %>%
     html_nodes(".title a") %>%
     html_text(trim = TRUE)
@@ -65,21 +67,25 @@ get_books <- function(i,stUrl) {
     html_nodes('.date_read') %>%
     map_df(~list(date_read = html_nodes(.x, '.date_row') %>% 
                    html_text(trim = TRUE) %>% 
+                   {if(length(.) == 0) NA else .} %>%
                    {if(length(.) > 1) extract2(.,1) else .} %>%
                    str_replace_all(., 'not set', NA_character_))) %>%
+    slice(2:n()) %>%
     mutate(newdate = mdy(date_read),
            year = year(newdate)) %>%
-    select(year)
+    pull(year) 
     
   monthRead <- html %>%
     html_nodes('.date_read') %>%
     map_df(~list(date_read = html_nodes(.x, '.date_row') %>% 
                    html_text(trim = TRUE) %>% 
+                   {if(length(.) == 0) NA else .} %>%
                    {if(length(.) > 1) extract2(.,1) else .} %>%
-                   str_replace_all(., 'not set', NA_character_)))%>%
+                   str_replace_all(., 'not set', NA_character_))) %>%
+    slice(2:n()) %>%
     mutate(newdate = mdy(date_read),
            month = month(newdate)) %>%
-    select(month)
+    pull(month)
   
   #sometimes there are NA years and you have to do these hijinx
   # yearRead1 <- html %>% # mcs
@@ -163,49 +169,16 @@ getnbooks <- function(stUrl=startUrl){
 # get books (this takes a while!)
 #(npages_in <- ceiling(getnbooks(stUrl = startUrl)/30) ) # 30 entries per page
 # This function is in operation, it's just now in the app instead of as a separate function
-scrape_goodreads <- function(npages = npages_in){
-  goodreads <- map_df(1:npages, ~{
-    Sys.sleep(5) # don't timeout the goodreads server
-    cat(.x)
-    get_books(.x,stUrl = startUrl)
-  })
-  return(goodreads)
-}
+#scrape_goodreads <- function(npages = npages_in){
+#   goodreads <- map_df(1:npages, ~{
+#     Sys.sleep(5) # don't timeout the goodreads server
+#     cat(.x)
+#     get_books(.x,stUrl = startUrl)
+#   })
+#   return(goodreads)
+# }
 
-# get big fun matrix for further analysis
-get_cmatrix_and_genres <- function(scraped_data){
-  goodreads <- scraped_data
-  goodreads_read <- goodreads %>%
-    select(-book_genres)
-  #write_csv(path = here('output',
-  #                      'goodreads_read.csv'))
-  
-  # save genre data
-  genres <- goodreads %>%
-    select(book_genres,year_read) %>%
-    mutate(id = 1:n()) %>%
-    unnest_longer(book_genres)
-  
-  # save genres by month
-  genres_month <- goodreads %>%
-    select(book_genres,month_read) %>%
-    mutate(id = 1:n()) %>%
-    unnest_longer(book_genres)
-  
-  # Turn genres by year into 'community matrix'
-  community <-  genres %>% 
-    pivot_longer(c(-id,-year_read)) %>% 
-    dplyr::count(year_read, value) %>% # to give each book its own diversity, change to dplyr::count(id, value)
-    pivot_wider(
-      names_from = value, 
-      values_from = n, 
-      values_fill = list(n = 0)
-    ) %>%
-    as.data.frame()
-  return(list(community = community,
-              genres = genres,
-              genres_month = genres_month,
-              goodreads_read = goodreads_read))
-}
+#goodreads <- scrape_goodreads(npages = npages_in)
+
 
 
