@@ -1,22 +1,22 @@
 # basic_diagnostics
 # For basic page, take csv data and produce:
 
-#library(lubridate)
-#library(here)
-#library(tidyverse)
-#library(ggpomological)
-#library(reshape2)
-#library(snakecase)
-#library(patchwork)
+# library(lubridate)
+# library(here)
+# library(tidyverse)
+# library(reshape2)
+# library(snakecase)
+# library(patchwork)
 
 # Load your own user data separately
-#testfile <- here::here('data','goodreads_library_export.csv')
+#testfile <- here::here('data','goodreads_library_export_k.csv')
 #cleaned_csv1 <- cleanup_csv(read.csv(testfile,header = TRUE))
   
 
 basic_diagnostics <- function(cleaned_csv = cleaned_csv1,
                               pal = bookpal){
-  read_books <- cleaned_csv
+  read_books <- cleaned_csv %>% 
+    filter(exclusive_shelf=='read')
   bbreaks <- seq(min(read_books$year_added,na.rm=T),
                  max(read_books$year_added,na.rm=T),by = 2)
   
@@ -29,36 +29,39 @@ basic_diagnostics <- function(cleaned_csv = cleaned_csv1,
     #      caption = "source: Goodreads") +
     scale_x_continuous(breaks=bbreaks,
                        labels=bbreaks) +
-    ggsidekick::theme_sleek(base_size = 12)
+    ggsidekick::theme_sleek(base_size = 14)
   
   PPY <- read_books %>%
-    ggplot(aes(x = year_read, y = sum(number_of_pages,na.rm=T))) +
+    group_by(year_read) %>%
+    summarize(pgs = sum(number_of_pages,na.rm=T)) %>%
+    ggplot(aes(x = year_read,
+               y = pgs)) +
     geom_col(fill = pal[6]) +
     xlab('Year') +
     ylab('Pages') +
     scale_x_continuous(breaks=bbreaks,
                        labels=bbreaks) +
-    ggsidekick::theme_sleek(base_size = 12)
+    ggsidekick::theme_sleek(base_size = 14)
   
   criticplot <- read_books %>% 
     group_by(year_read) %>% 
     summarize(my_mean_rating = mean(my_rating),
               allusers_mean_rating=mean(average_rating)) %>%
-    ggplot(aes(x=year_read)) +
-    geom_segment(aes(y=allusers_mean_rating,
-                     yend=my_mean_rating,
-                     xend=year_read),
-                 col="darkgrey",lwd=0.5) +
-    geom_point(aes(x=year_read,y=allusers_mean_rating),colour="grey",size=3) + 
-    geom_point(aes(x=year_read,y=my_mean_rating),colour=pal[1],size=3) +
-    ylab("Average rating") +
+    mutate(ratingdiff = my_mean_rating-allusers_mean_rating,
+           above = ifelse(ratingdiff>0,'Above average','Below average')) %>%
+    ggplot() +
+    geom_hline(yintercept = 0,lty=2,colour='grey50') +
+    geom_segment(aes(x=year_read,y=0, yend = ratingdiff,xend=year_read),
+                 colour = 'grey50',lwd=.8) +
+    geom_point(aes(x=year_read,y=ratingdiff,colour = above),size=3) +
+    scale_colour_manual('',values = pal[c(1,2)]) +
+    ylab("Your ratings relative to \n the Goodreads community") +
     xlab("Year") +
     scale_x_continuous(breaks=bbreaks,
                        labels=bbreaks) +
-    labs(title = "Have you become a more critical reader?",
-         caption = "source: Goodreads") +
-    ggsidekick::theme_sleek(base_size=12) +
-    theme(legend.position = 'bottom')
+    labs(caption = "source: Goodreads") +
+    ggsidekick::theme_sleek(base_size=14) +
+    theme(legend.position = 'bottom') 
   
   x <- read_books %>%
     group_by(year_added) %>%
@@ -80,10 +83,10 @@ basic_diagnostics <- function(cleaned_csv = cleaned_csv1,
     ggplot(aes(x = year,y = cn,fill = AR)) + 
     geom_area(size=0.5,colour='white') +
     scale_x_continuous(breaks = bbreaks) +
-    ggsidekick::theme_sleek(base_size = 12) +
+    ggsidekick::theme_sleek(base_size = 14) +
     scale_fill_manual('',values = pal[3:4]) +
     xlab('Year') +
-    ylab('Cumulative books finished or added') +
+    ylab('Cumulative books \nfinished or added') +
     theme(legend.position = 'bottom')
   
   (BPY | PPY) / (cumubooks | criticplot)
@@ -110,18 +113,18 @@ time_to_finish_shelves <- function(cleaned_csv = cleaned_csv1,
   
   nyears <- max(read_books$year_read,na.rm=T) - min(read_books$year_added,na.rm=T)
   bpy <- nread/nyears
-  print(nread)
-  print(bpy)
-  print(n2read)
-  nyears_to_finish <- n2read/bpy
+  nyears_to_finish <- round(n2read/bpy, digits = 2)
   
   #Plot 
   plotdat <- read_books %>%
     filter(exclusive_shelf == 'read') %>%
     mutate(ttr = year_read - year_added) %>%
     mutate(title = fct_reorder(title, ttr, max, .desc = TRUE)) %>%
-    top_n(6) %>%
-    arrange(desc(-ttr)) 
+    top_n(5,wt = ttr) 
+  if(nrow(plotdat)>6) plotdat <- plotdat[1:6,]
+  
+  emptylabel <- "If there are no orange bars here, you haven't added a book before reading it - prompt!"
+  wrapper <- function(x, ...) paste(strwrap(x, ...), collapse = "\n")
   
   ibp <- plotdat %>%
     ggplot(aes(title,ttr)) +
@@ -130,9 +133,15 @@ time_to_finish_shelves <- function(cleaned_csv = cleaned_csv1,
     scale_x_discrete(labels = function(x) str_wrap(x, width = 40)) +
     xlab("Books you waited longest to read") +
     ylab("Years between adding the book \nto your shelf and reading it") +
-    coord_flip()
-  
- # if(all(is.na(plotdat$ttr))){ibp <- ibp + annotate()}
+    coord_flip() 
+  #ibp
+ 
+  if(all(is.na(plotdat$ttr))){ibp <- ibp + 
+    annotate("label",
+             x = 5,y = 2,
+             label = wrapper(emptylabel,width = 20),
+             family = "",
+             fontface = 1, size=4)}
   
     
   return(list(nyears_to_finish = nyears_to_finish,
