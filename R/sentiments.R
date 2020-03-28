@@ -12,6 +12,9 @@
 #goodreads <- read.csv(here::here('output','goodreads_read.csv'))
 #read_books_data <- goodreads
 
+ #afinn_man <- get_sentiments('afinn')
+ #save(afinn_man,file = 'AFINNdat.RData') # sorry!
+
 tidy_the_books <- function(read_books_data){
   #read_books_data is the scraped data 'goodreads_read'
   clean_book_descs <- read_books_data %>%
@@ -23,6 +26,7 @@ tidy_the_books <- function(read_books_data){
     select(-book_description)
   
   data('stop_words')
+  #print(head(stop_words))
   tidied_books <- descs_unnested %>%
     anti_join(stop_words, by = "word")
   return(tidied_books)
@@ -72,12 +76,11 @@ get_word_table <- function(tidied_books){
   return(tidy_book_words) # NOTE: show this as a cute kable table
 }
 
-get_AFINN_plot <- function(tidied_books){
-  data(sentiments)
+get_AFINN_plot <- function(tidied_books,afinnsentiments){
   tidy_book_words <- get_word_table(tidied_books)
   word_sentiments <- tidy_book_words %>%
-    inner_join(get_sentiments("afinn"), by = "word") 
-  print(word_sentiments)
+    inner_join(afinnsentiments, by = "word") 
+  #print(word_sentiments)
   
   afinnplot <- word_sentiments %>% 
     filter(!is.na(year_read)) %>%
