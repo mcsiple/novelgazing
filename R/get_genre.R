@@ -18,12 +18,18 @@ get_genre <- function(cleaned_books,i){
 }
 
 
-genrelist <- list()
-s <- Sys.time()
-for(i in 1:nrow(cleaned_books)){
-  genrelist[[i]] <- get_genre(cleaned_books = cleaned_books,i = i)
-  print(i)
-  print(genrelist[i])
-}
-st <- Sys.time()
-print(st - s)
+# genrelist <- list()
+# s <- Sys.time()
+# for(i in 1:nrow(cleaned_books)){
+#   genrelist[[i]] <- get_genre(cleaned_books = cleaned_books,i = i)
+#   print(i)
+#   print(genrelist[i])
+# }
+# st <- Sys.time()
+# print(st - s)
+# full_data <- tibble(title = cleaned_books$title,
+#                     author = cleaned_books$author,
+#                     month_read = cleaned_books$month_read,
+#                     year_read = cleaned_books$year_read,
+#                     exclusive_shelf = cleaned_books$exclusive_shelf,
+#                     book_genres = genrelist)
