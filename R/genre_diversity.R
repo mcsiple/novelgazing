@@ -1,5 +1,5 @@
 # genre diversity over time
-# 
+# community <- read.csv(here::here('output','communitymatrix.csv'))
 get_rainbow_plot <- function(comm_genre,pal,whichplot){
   #comm_genre is the result of get_cmatrix_and_genres(fulldata = full_data)
   #whichplot is 'yearly' or 'monthly'
@@ -30,8 +30,13 @@ get_rainbow_plot <- function(comm_genre,pal,whichplot){
     arrange(desc(bcount)) %>%
     top_n(bcount, n = 10)
   
+  top10genres <- top10genres$book_genres
+  
   pdat <- allgenres %>%
-    mutate(simple_genre = ifelse(book_genres %in% top10genres$book_genres,book_genres,'Other')) %>%
+    mutate(simple_genre = 
+             ifelse(book_genres %in% top10genres,
+                    book_genres,
+                    'Other')) %>%
     group_by(year_read,simple_genre) %>%
     ungroup(simple_genre) %>%
     mutate(simple_genre = fct_relevel(simple_genre, 'Other', after = Inf))
@@ -69,7 +74,9 @@ get_rainbow_plot <- function(comm_genre,pal,whichplot){
     mutate(month_read = as.integer(month_read))
   
   pdatm <- allgenres_month %>%
-    mutate(simple_genre = ifelse(book_genres %in% top10genres$book_genres,book_genres,'Other')) %>%
+    mutate(simple_genre = ifelse(book_genres %in% top10genres,
+                                 book_genres,
+                                 'Other')) %>%
     group_by(month_read,simple_genre) %>%
     ungroup(simple_genre) %>%
     mutate(simple_genre = fct_relevel(simple_genre, 'Other', after = Inf))
@@ -84,7 +91,7 @@ get_rainbow_plot <- function(comm_genre,pal,whichplot){
     scale_x_continuous(breaks = 1:12,labels = month.abb) +
     xlab('Month') +
     ylab('Count among books you finished \n (across all years)') +
-    labs(caption = 'Topic data are from the OpenLibrary API. Not all books ahve topic data available.')+
+    labs(caption = 'Topic data are from the OpenLibrary API. Topic data are not available for all books.') +
     ggsidekick::theme_sleek(base_size = 14)
     return(rb_mo)
   }
@@ -125,7 +132,7 @@ get_rarefaction <- function(community,pal){
     geom_ribbon(aes(ymin=loSD,ymax=hiSD),alpha=0.6, fill = pal[4]) +
     geom_line(colour = pal[3],lwd=1.2) +
     scale_x_continuous(breaks = bbreaks) +
-    ylab('Genre richness') +
+    ylab('Subject richness') +
     xlab('Year') +
     ggsidekick::theme_sleek(base_size=14) +
     labs(caption = 'Richness +/- 1 SD')
@@ -138,33 +145,85 @@ get_rarefaction <- function(community,pal){
 get_mds <- function(community,pal){
   cmatrix <-  as.matrix(community)
   year <- cmatrix[,1]
+  bbreaks <- seq(min(year,na.rm=T),max(year,na.rm=T),1)
   mds.log <- log(cmatrix[,-1]+1)
   sol <- metaMDS(mds.log)
   vec.sp <- envfit(sol$points, mds.log, perm=1000)
   vec.sp.df <- as.data.frame(vec.sp$vectors$arrows*sqrt(vec.sp$vectors$r))
   vec.sp.df$species <- rownames(vec.sp.df)
   vec.sp.df.tp <- vec.sp.df
-  ord <- mds$points %>%
+  ord <- sol$points %>%
     as.data.frame() %>%
     add_column(year,group=1) %>%
     mutate(year = as.integer(year)) 
   
   ordplot <- 
     ord %>% filter(!is.na(year)) %>%
-    ggplot(aes(MDS1,MDS2,color = year,group = factor(group))) +
+    ggplot(aes(MDS1,MDS2,
+               color = year,
+               group = factor(group))) +
     geom_point(size=4) +
     geom_path() +
-    scale_colour_gradient(low = pal[2],high = pal[3])+
-    geom_segment(data=vec.sp.df.tp,
-                 aes(x=0,xend=MDS1,y=0,yend=MDS2),
-                 inherit.aes = FALSE,
-                 arrow = arrow(length = unit(0.5, "cm")),
-                 colour="grey") + 
-    geom_text(data=vec.sp.df.tp,
-              aes(x=MDS1,y=MDS2,label=species),
-              inherit.aes = FALSE,size=5) +
+    scale_colour_gradient(low = pal[2],
+                          high = pal[3]) +
     ggsidekick::theme_sleek(base_size=14)
-  #ordplot
+  ordplot
   return(ordplot)
 }
 
+
+# MDS comparison ----------------------------------------------------------
+g <- get_cmatrix_and_genres(fulldata = full_data)
+community <- g$community
+community_toread <- g$community_toread
+
+get_mds_comp <- function(community,community_toread,pal){
+  if(nrow(community)<2 | nrow(community_toread)<2){return(ggplot() + theme_void())} else{
+  
+  #community
+  cmatrix <-  as.matrix(community)
+  year <- cmatrix[,1]
+  mds.log <- log(cmatrix[,-1]+1)
+  sol <- metaMDS(mds.log)
+  vec.sp <- envfit(sol$points, mds.log, perm=1000)
+  vec.sp.df <- as.data.frame(vec.sp$vectors$arrows*sqrt(vec.sp$vectors$r))
+  vec.sp.df$species <- rownames(vec.sp.df)
+  vec.sp.df.tp <- vec.sp.df
+  ord <- sol$points %>%
+    as.data.frame() %>%
+    add_column(year,group=1) %>%
+    mutate(year = as.integer(year)) %>%
+    mutate(Shelf = 'Read')
+  
+  cmatrix <-  as.matrix(community_toread)
+  year <- cmatrix[,1]
+  mds.log <- log(cmatrix[,-1]+1)
+  sol <- metaMDS(mds.log)
+  vec.sp <- envfit(sol$points, mds.log, perm=1000)
+  vec.sp.df <- as.data.frame(vec.sp$vectors$arrows*sqrt(vec.sp$vectors$r))
+  vec.sp.df$species <- rownames(vec.sp.df)
+  vec.sp.df.tp <- vec.sp.df
+  ord2 <- sol$points %>%
+    as.data.frame() %>%
+    add_column(year,group=1) %>%
+    mutate(year = as.integer(year))  %>%
+    mutate(Shelf = 'To Read')
+  
+  bigord <- bind_rows(ord,ord2)
+  
+  ordplot <- 
+    bigord %>% 
+    filter(!is.na(year)) %>%
+    ggplot(aes(MDS1,MDS2,color = Shelf)) +
+    geom_point(size=4) +
+    scale_color_manual(values = pal[c(3,6)]) +
+    geom_polygon(aes(fill = Shelf),alpha=0.5) +
+    scale_fill_manual(values = pal[c(3,6)]) +
+    ggsidekick::theme_sleek(base_size=14)
+  
+  ordplot
+  
+  return(ordplot)}
+}
+
+get_mds_comp(community = community,community_toread = community_toread,pal=bookpal)
