@@ -68,4 +68,4 @@ get_cmatrix_and_genres <- function(fulldata){
               genres_month = genres_month,
               goodreads_read = goodreads_read))
 }
-#get_cmatrix_and_genres(fulldata = nf)
+#get_cmatrix_and_genres(fulldata = full_data)

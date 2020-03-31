@@ -2,10 +2,9 @@
 # library(here)
 # library(tidyverse)
 # library(snakecase)
-
-#testfile <- here::here('data','goodreads_library_export.csv')
-#my_books <- read.csv(testfile,header = TRUE)
-#cleaned_books <- cleanup_csv(my_books=my_books)
+# testfile <- here::here('data','goodreads_library_export.csv')
+# my_books <- read.csv(testfile,header = TRUE)
+# cleaned_books <- cleanup_csv(my_books=my_books)
 
 cleanup_csv <- function(my_books){
   # my_books is a dataframe from read.csv()
