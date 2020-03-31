@@ -5,11 +5,11 @@ library(tidyverse)
 library(stringr)
 library(textdata)
 library(textcat) #for detecting language
-#library(rvest) # webscrape stuff
-library(httr)
+library(ggsidekick)
 library(magrittr) # more webscraping
 library(lubridate)
 library(curl) #for id'ing agent to server
+library(httr)
 library(snakecase)
 library(reshape2)
 library(patchwork)
@@ -27,7 +27,7 @@ source(here::here('R','get_genre.R'))
 source(here::here('R','get_cmatrix_and_genres.R'))
 
 # Data --------------------------------------------------------------------
-load(here::here('R','AFINNdat.RData')) #afinn_man
+#load(here::here('R','AFINNdat.RData')) #afinn_man
 
 
 # Aesthetics --------------------------------------------------------------
@@ -65,7 +65,6 @@ ui <- navbarPage('Novel-gazing',
                                            h6('Illustrations by Ashley Siple')))
                           ),
                  tabPanel("1. Your books",
-                          # Sidebar with a slider input for number of bins 
                           sidebarLayout(
                              sidebarPanel(
                                 imageOutput('books_tower',inline = TRUE),
@@ -90,7 +89,14 @@ ui <- navbarPage('Novel-gazing',
                                 h4('A glimpse of your data'),
                                 tableOutput('rawdata')
                              ))),
-                 tabPanel("2. The big picture",
+                 tabPanel("2. At a glance",
+                          h3('Some basic info'),
+                          #tableOutput('short_long'),
+                          h3('How long does it take you to read a book after adding it to your shelf?')
+                          
+                          
+                 ),
+                 tabPanel("2. The long term",
                           h3('Reading history'),
                           plotOutput('basicstuff'),
                           h3('How long does it take you to read a book after adding it to your shelf?'),
@@ -114,13 +120,14 @@ ui <- navbarPage('Novel-gazing',
                                 p('We can use OpenLibrary to get the topics of all the books on your shelves. This takes a while, but it will be worth it!'),
                                 p('NOTE: This may take a while so go get a coffee after you click the button.'),
                                 actionButton("genrego", "Get genre info!", icon("book", lib = "glyphicon","fa-2x"),
-                                             style="color: #fff; background-color: #ff7506; border-color: #ff7506")
-                                # ,
-                                # imageOutput('books_sit',inline = TRUE)
+                                             style="color: #fff; background-color: #ff7506; border-color: #ff7506"),
+                                br(),
+                                br(),
+                                imageOutput('books_group',inline = TRUE)
                              ),
                              mainPanel(
                           h3('How has the community on your bookshelf changed over time?'),
-                          p('Once all the subjects of your books have been detected, you can look at it like we would an ecological community. How diverse are the genres you read? Do you read more of certain genres in specific seasons?'),
+                          p('Once all the subjects of your books have been detected, you can look at it like we would an ecological community. How diverse are the subjects you read? Do you read more of some subjects in certain seasons?'),
                           br(),
                           h4('The composition of your read shelf over time'),
                           fluidRow(column(5,
@@ -129,11 +136,19 @@ ui <- navbarPage('Novel-gazing',
                                           plotOutput('rainbow_month'))),
                           br(),
                           h4('Diversity and genre richness'),
-                          p('We can apply some community ecology methods to your bookshelf to ask questions like, how diverse is your reading? The plot on the left shows a common diversity index, Shannon diversity. The plot on the right shows a rarefaction curve. If it has plateaued, you have leveled out in terms of genres you tend to read (we use this in ecology to estimate whether the samples (on the x axis) have adequately characterized the community.'),
+                          p('We can apply some community ecology methods to your bookshelf to ask questions like, how diverse is your reading? The plot on the left shows a common diversity index, Shannon diversity. The higher it is, the more diverse your subject material is. The plot on the right shows a rarefaction curve. If it has plateaued, you have leveled out in terms of topics you tend to read. We use this type of curve in ecology to estimate whether the samples, on the x axis, have adequately characterized the community.'),
                           fluidRow(column(6,
                                           plotOutput('diversity')),
                                    column(6,
                                           plotOutput('rarefaction'))),
+                          h3('How similar is your to-read shelf to your read shelf?'),
+                          p('In ecology, we compare animal and plant communities from different samples using multivariate statistics. The plot below shows each year of data as a single point, and its position is based on the subjects you read (or wanted to read) that year. Do the yellow and blue areas overlap? Then you may be reading the same types of books you aspire to read.'),
+                          fluidRow(column(4,
+                                          imageOutput('books_lie',inline = TRUE),
+                                          imageOutput('books_hug',inline = TRUE)
+                                          ),
+                                   column(8,
+                                          plotOutput('mdscomp'))),
                           fluidRow(column(12,
                                           h5('A note about the Open Library data'),
                                           p('This app uses Open Library to look up the subjects listed for each book by its ISBN. These data are not available for every book, and some important info might be missing. If you want to webscrape genres from your Goodreads account, you can do that to get a more comprehensive list of genres.')))
@@ -224,7 +239,8 @@ server <- function(input, output) {
    )
    
    comm_genres <- reactive({
-      get_cmatrix_and_genres(fulldata = full_data())})
+      get_cmatrix_and_genres(fulldata = full_data())
+      })
    
    output$full <- renderTable({
       goodreads <- full_data()
@@ -309,6 +325,13 @@ server <- function(input, output) {
       }
    })
    
+   output$mdscomp <- renderPlot({
+      x <- get_cmatrix_and_genres(fulldata = full_data())
+      y <- x$community
+      z <- x$community_toread
+      get_mds_comp(community = y,community_toread = z,pal = bookpal)
+   })
+   
 
 # Images ------------------------------------------------------------------
 
@@ -350,11 +373,35 @@ server <- function(input, output) {
       filename <- normalizePath(here::here('www','books_mice.png'))
       list(src = filename,
            alt = 'mice',
-           width = 300)
+           width = 240)
    }, deleteFile = FALSE)
    # # 
    output$books_sit <- renderImage({
       filename <- normalizePath(here::here('www','books_sit.png'))
+      list(src = filename,
+           alt = 'sit',
+           width = 240,
+           height = 240)
+   }, deleteFile = FALSE)
+   
+   output$books_lie <- renderImage({
+      filename <- normalizePath(here::here('www','books_lie.png'))
+      list(src = filename,
+           alt = 'sit',
+           width = 240,
+           height = 240)
+   }, deleteFile = FALSE)
+   
+   output$books_hug <- renderImage({
+      filename <- normalizePath(here::here('www','books_hug.png'))
+      list(src = filename,
+           alt = 'hug',
+           width = 240,
+           height = 240)
+   }, deleteFile = FALSE)
+   
+   output$books_group <- renderImage({
+      filename <- normalizePath(here::here('www','books_group.png'))
       list(src = filename,
            alt = 'sit',
            width = 240,
