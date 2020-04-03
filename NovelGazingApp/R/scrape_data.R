@@ -40,6 +40,7 @@ get_books <- function(i,stUrl) {
   # NOTE: This reads from DATE ADDED not date finished!
   #html <- read_html(url)
   html <- read_html(curl(url,handle = curl::new_handle("useragent" = "Mozilla/5.0")))
+  
   title <- html %>%
     html_nodes(".title a") %>%
     html_text(trim = TRUE)
@@ -85,7 +86,6 @@ get_books <- function(i,stUrl) {
     mutate(newdate = mdy(date_read),
            month = month(newdate)) %>%
     pull(month)
-  #This will work when there are NA values in multiple reads of the same book, but not when there is a mising date_read in a single-read book. Hmph!
   
   #sometimes there are NA years and you have to do these hijinx
   # yearRead1 <- html %>% # mcs
@@ -180,40 +180,5 @@ getnbooks <- function(stUrl=startUrl){
 
 #goodreads <- scrape_goodreads(npages = npages_in)
 
-# get big fun matrix for further analysis
-get_cmatrix_and_genres <- function(scraped_data){
-  goodreads <- scraped_data
-  goodreads_read <- goodreads %>%
-    select(-book_genres)
-  #write_csv(path = here('output',
-  #                      'goodreads_read.csv'))
-  
-  # save genre data
-  genres <- goodreads %>%
-    select(book_genres,year_read) %>%
-    mutate(id = 1:n()) %>%
-    unnest_longer(book_genres)
-  
-  # save genres by month
-  genres_month <- goodreads %>%
-    select(book_genres,month_read) %>%
-    mutate(id = 1:n()) %>%
-    unnest_longer(book_genres)
-  
-  # Turn genres by year into 'community matrix'
-  community <-  genres %>% 
-    pivot_longer(c(-id,-year_read)) %>% 
-    dplyr::count(year_read, value) %>% # to give each book its own diversity, change to dplyr::count(id, value)
-    pivot_wider(
-      names_from = value, 
-      values_from = n, 
-      values_fill = list(n = 0)
-    ) %>%
-    as.data.frame()
-  return(list(community = community,
-              genres = genres,
-              genres_month = genres_month,
-              goodreads_read = goodreads_read))
-}
 
 

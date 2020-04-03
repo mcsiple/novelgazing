@@ -1,11 +1,9 @@
 # genre diversity over time
-# community <- read.csv(here::here('output','communitymatrix.csv'))
-
+  
 get_rainbow_plot <- function(comm_genre,pal,whichplot){
   #comm_genre is the result of get_cmatrix_and_genres(fulldata = full_data)
   #whichplot is 'yearly' or 'monthly'
-  
-  if(whichplot == 'yearly'){
+
   #cleanup genres
   g <- comm_genre$genres
   g <- g %>%
@@ -25,22 +23,23 @@ get_rainbow_plot <- function(comm_genre,pal,whichplot){
     #filter(total>1) %>% 
     mutate(year_read = as.integer(year_read))
   
-  top10genres <- g %>%
+  topgenres <- g %>%
     group_by(book_genres) %>%
     summarize(bcount = length(book_genres)) %>%
     arrange(desc(bcount)) %>%
-    top_n(bcount, n = 10)
+    top_n(bcount, n = 15)
   
-  top10genres <- top10genres$book_genres
+  topgenres <- topgenres$book_genres
   
   pdat <- allgenres %>%
     mutate(simple_genre = 
-             ifelse(book_genres %in% top10genres,
+             ifelse(book_genres %in% topgenres,
                     book_genres,
                     'Other')) %>%
     group_by(year_read,simple_genre) %>%
     ungroup(simple_genre) %>%
     mutate(simple_genre = fct_relevel(simple_genre, 'Other', after = Inf))
+  
   nb.cols <- length(levels(pdat$simple_genre))
   mycolors <- colorRampPalette(pal)(nb.cols)
   mycolors[levels(pdat$simple_genre)=='Other'] = 'gray'
@@ -51,22 +50,14 @@ get_rainbow_plot <- function(comm_genre,pal,whichplot){
   rb <- pdat %>% 
     ggplot(aes(year_read,total,fill=simple_genre)) + 
     geom_col() +
-    scale_x_continuous(breaks = bbreaks) +
+    scale_x_continuous(labels = scaleFUN) +
     scale_fill_manual('Your top genres',values = mycolors) +
     xlab('Year') +
     ylab('Count among books you finished') +
     ggsidekick::theme_sleek(base_size = 14) +
-    labs(caption = "*Note: Most books have cross-referenced,\n so the topic total may be higher than the number of books you read.") +
     theme(legend.position = 'none')
-  return(rb)}else{
-    
-    
+  
   gm <- comm_genre$genres_month
-  top10genres <- gm %>%
-    group_by(book_genres) %>%
-    summarize(bcount = length(book_genres)) %>%
-    arrange(desc(bcount)) %>%
-    top_n(bcount, n = 10)
   
   allgenres_month <- gm %>%
     group_by(month_read,book_genres) %>%
@@ -75,12 +66,13 @@ get_rainbow_plot <- function(comm_genre,pal,whichplot){
     mutate(month_read = as.integer(month_read))
   
   pdatm <- allgenres_month %>%
-    mutate(simple_genre = ifelse(book_genres %in% top10genres,
+    mutate(simple_genre = ifelse(book_genres %in% topgenres,
                                  book_genres,
                                  'Other')) %>%
     group_by(month_read,simple_genre) %>%
     ungroup(simple_genre) %>%
     mutate(simple_genre = fct_relevel(simple_genre, 'Other', after = Inf))
+  
   nb.cols <- length(levels(pdatm$simple_genre))
   mycolors <- colorRampPalette(pal)(nb.cols)
   mycolors[levels(pdatm$simple_genre)=='Other'] = 'gray'
@@ -92,11 +84,11 @@ get_rainbow_plot <- function(comm_genre,pal,whichplot){
     scale_x_continuous(breaks = 1:12,labels = month.abb) +
     xlab('Month') +
     ylab('Count among books you finished \n (across all years)') +
-    labs(caption = 'Topic data are from the OpenLibrary API. \n
-         Topic data are not available for all books.') +
-    ggsidekick::theme_sleek(base_size = 14)
-    return(rb_mo)
-  }
+    labs(caption = 'Topic data are from the OpenLibrary API and are not available for all books.') +
+    ggsidekick::theme_sleek(base_size = 14) +
+    theme(legend.position = 'bottom')
+  
+  if(whichplot == 'yearly'){return(rb)}else{return(rb_mo)}
 }
 
 get_divplot <- function(community){
@@ -144,14 +136,14 @@ get_rarefaction <- function(community,pal){
 
 #get_rarefaction(community = comm,pal = bookpal)
 
-# What I want to do: an NMDS plot of all the books. But I have nixed it because NMDS is hard to interpret and is randomized so will look different every time (thus, hard to to interpret!)
+# What I want to do: an NMDS plot of all the books. But I am so-so on it because NMDS is hard to interpret and is randomized so will look different every time (thus, hard to to interpret!)
 get_mds <- function(community,pal){
   cmatrix <-  as.matrix(community)
   year <- cmatrix[,1]
   bbreaks <- seq(min(year,na.rm=T),max(year,na.rm=T),1)
   mds.log <- log(cmatrix[,-1]+1)
   sol <- metaMDS(mds.log)
-  vec.sp <- envfit(sol$points, mds.log, perm=1000)
+  vec.sp <- envfit(sol$points, mds.log, perm=500)
   vec.sp.df <- as.data.frame(vec.sp$vectors$arrows*sqrt(vec.sp$vectors$r))
   vec.sp.df$species <- rownames(vec.sp.df)
   vec.sp.df.tp <- vec.sp.df
@@ -221,8 +213,6 @@ get_mds_comp <- function(community,community_toread,pal){
     ggplot(aes(MDS1,MDS2,color = Shelf)) +
     geom_point(size=4) +
     scale_color_manual(values = pal[c(3,6)]) +
-    geom_polygon(aes(fill = Shelf),alpha=0.5) +
-    scale_fill_manual(values = pal[c(3,6)]) +
     ggsidekick::theme_sleek(base_size=16)
   
   ordplot

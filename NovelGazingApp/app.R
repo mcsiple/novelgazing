@@ -6,13 +6,14 @@ library(stringr)
 library(textdata)
 library(textcat) #for detecting language
 library(ggsidekick)
-library(magrittr) # more webscraping
+library(magrittr) # optional webscraping
 library(lubridate)
 library(curl) #for id'ing agent to server
 library(httr)
 library(snakecase)
 library(reshape2)
 library(patchwork)
+library(ggrepel)
 library(tidytext) #for sentiment analysis
 library(vegan) # for ecology measures
 library(kableExtra) # for nice tables
@@ -25,10 +26,7 @@ source(here::here('R','jumbotron2.R'))
 source(here::here('R','genre_diversity.R'))
 source(here::here('R','get_genre.R'))
 source(here::here('R','get_cmatrix_and_genres.R'))
-
-# Data --------------------------------------------------------------------
-#load(here::here('R','AFINNdat.RData')) #afinn_man
-
+source(here::here('R','summary_stats.R'))
 
 # Aesthetics --------------------------------------------------------------
 bookpal <- c('#ff7506', #dark orange
@@ -64,7 +62,7 @@ ui <- navbarPage('Novel-gazing',
                                            h6('By Megsie Siple'),
                                            h6('Illustrations by Ashley Siple')))
                           ),
-                 tabPanel("1. Your books",
+                 tabPanel("Your books",
                           sidebarLayout(
                              sidebarPanel(
                                 imageOutput('books_tower',inline = TRUE),
@@ -76,7 +74,7 @@ ui <- navbarPage('Novel-gazing',
                              ),
                              mainPanel(
                                 h3('How to get your data'),
-                                p('Goodreads allows you to export a .csv file from your account.'),
+                                p('Goodreads allows you to export a .csv file from your account. You must use the website, not the phone app, to do this.'),
                                 imageOutput('HowToAll',inline = TRUE),
                                 br(),
                                 h4('Getting your data from Goodreads:'),
@@ -89,14 +87,21 @@ ui <- navbarPage('Novel-gazing',
                                 h4('A glimpse of your data'),
                                 tableOutput('rawdata')
                              ))),
-                 tabPanel("2. At a glance",
-                          h3('Some basic info'),
-                          #tableOutput('short_long'),
-                          h3('How long does it take you to read a book after adding it to your shelf?')
+                 tabPanel("Your taste in books",
+                          h3("Your chart-topping books"),
+                          tableOutput('short_long'),
+                          fluidRow(column(6,
+                                          tableOutput("top3authcount")),
+                                   column(6,
+                                          tableOutput("top3authrating")
+                                          )),
+                          h3('How does your taste compare to that of other Goodreads users?'),
+                          p('Have you ever wondered how your taste in books compares to that of your peers? The plot below shows your ratings compared to those of other users.'),
+                          plotOutput('likeplot')
                           
                           
                  ),
-                 tabPanel("2. The long term",
+                 tabPanel("The long term",
                           h3('Reading history'),
                           plotOutput('basicstuff'),
                           h3('How long does it take you to read a book after adding it to your shelf?'),
@@ -105,14 +110,13 @@ ui <- navbarPage('Novel-gazing',
                                           ),
                                    column(4,
                                           br(),
-                                          htmlOutput('timestatement')
-                                          ,
+                                          htmlOutput('timestatement'),
                                           imageOutput('books_sit',inline = TRUE)
                                           # 
                                           )
                                    )
                  ),
-                 tabPanel("3. The ecology of your bookshelf",
+                 tabPanel("The ecology of your bookshelf",
                           sidebarLayout(
                              sidebarPanel(
                                 imageOutput('books_mice',inline = TRUE),
@@ -129,62 +133,47 @@ ui <- navbarPage('Novel-gazing',
                           h3('How has the community on your bookshelf changed over time?'),
                           p('Once all the subjects of your books have been detected, you can look at it like we would an ecological community. How diverse are the subjects you read? Do you read more of some subjects in certain seasons?'),
                           br(),
-                          h4('The composition of your read shelf over time'),
-                          fluidRow(column(5,
-                                          plotOutput('rainbow_yr')),
-                                   column(7,
-                                          plotOutput('rainbow_month'))),
+                          p("This is the most finicky of the tabs because it uses an API to collect subject data on your books. If you get an error, just try again later."),
+                          htmlOutput('HTTP_status'),
                           br(),
-                          h4('Diversity and genre richness'),
+                          h4('The composition of your read shelf over time'),
+                          plotOutput('rainbow_yr'),
+                          plotOutput('rainbow_month'),
+                          
+                          br(),
+                          h4('Diversity and subject richness'),
                           p('We can apply some community ecology methods to your bookshelf to ask questions like, how diverse is your reading? The plot on the left shows a common diversity index, Shannon diversity. The higher it is, the more diverse your subject material is. The plot on the right shows a rarefaction curve. If it has plateaued, you have leveled out in terms of topics you tend to read. We use this type of curve in ecology to estimate whether the samples, on the x axis, have adequately characterized the community.'),
                           fluidRow(column(6,
                                           plotOutput('diversity')),
                                    column(6,
                                           plotOutput('rarefaction'))),
                           h3('How similar is your to-read shelf to your read shelf?'),
-                          p('In ecology, we compare animal and plant communities from different samples using multivariate statistics. The plot below shows each year of data as a single point, and its position is based on the subjects you read (or wanted to read) that year. Do the yellow and blue areas overlap? Then you may be reading the same types of books you aspire to read.'),
+                          p('In ecology, we compare animal and plant communities from different samples using multivariate statistics. The plot below shows each year of data as a single point, and its position is based on the subjects you read (or wanted to read) that year. Do the yellow and blue points overlap? Then you may be reading the same types of books you aspire to read.'),
+                          actionButton("mds_go", "Compare my shelves!", icon("book", lib = "glyphicon","fa-2x"),
+                                       style="color: #fff; background-color: #ff7506; border-color: #ff7506"),
                           fluidRow(column(4,
-                                          imageOutput('books_lie',inline = TRUE),
-                                          imageOutput('books_hug',inline = TRUE)
+                                          br(),
+                                          br(),
+                                          br(),
+                                          imageOutput('books_lie',inline = TRUE)
+                                          #,
+                                          #imageOutput('books_hug',inline = TRUE)
                                           ),
                                    column(8,
                                           plotOutput('mdscomp'))),
                           fluidRow(column(12,
                                           h5('A note about the Open Library data'),
-                                          p('This app uses Open Library to look up the subjects listed for each book by its ISBN. These data are not available for every book, and some important info might be missing. If you want to webscrape genres from your Goodreads account, you can do that to get a more comprehensive list of genres.')))
-                 )))
-                 #,
-                 # tabPanel("4. Sentiment analysis"
-                 #          ,
-                 #          sidebarLayout(
-                 #             sidebarPanel(
-                 #                h4('Enter your Goodreads info'),
-                 #                p('NOTE: This will take a LONG time (~3 mins per page) so go get a coffee after you enter your info and click the button.'),
-                 #                # checkboxInput('hurry',label = 'I am in a hurry- just collect a subset of the results',value = TRUE),
-                 #                actionButton("go", "Get sentiments!", icon("book", lib = "glyphicon","fa-2x"),
-                 #                             style="color: #fff; background-color: #ff7506; border-color: #ff7506"),
-                 #             ),
-                 #             mainPanel(
-                 #                h4('How to find your user ID and username'),
-                 #                p('If you go to your user profile on goodreads, your user ID and username are in the URL above.'),
-                 #                imageOutput(outputId = 'HowToScrape',inline = TRUE),
-                 #                br(),
-                 #                h4('A glimpse of the scraped data'),
-                 #                tableOutput('full'),
-                 #                p('Now you can look at some more fun patterns in the descriptions of your books.'),
-                 #                br(),
-                 #                h4('Sentiment analysis of your bookshelf'),
-                 #                plotOutput('afinn'),
-                 #                fluidRow(column(6,
-                 #                                h5('Bing sentiment scores from your book descriptions'),
-                 #                                plotOutput('sentiments')),
-                 #                         column(6,
-                 #                                h5('The top 10 most common words in your book descriptions'),
-                 #                                tableOutput('keywords'))
-                 #                )
-                 #             )))
-                 
-                 
+                                          p('This app uses Open Library to look up the subjects listed for each book by its ISBN. These data are not available for every book, and some important info might be missing. If you want to webscrape genres from your Goodreads account, you can do that to get a more comprehensive list of genres. The code to do this is in the project repository (see Contributing for the link).')))
+                 ))),
+                 tabPanel("Contributing",
+                          h3("Share your thoughts or contribute code"),
+                          p("Do you have ideas for features or want to contribute your own code and/or are a wizard at JSON? I welcome ideas and consider this a work in progress."),
+                          tags$ol(tags$li("Privacy: This app does not save any of your data. It is gone as soon as you close the window"),
+                             tags$li("This project uses user data from", a(href="https://www.goodreads.com/api","Goodreads")," but this app barely scratches the surface!"),
+                             tags$li("If you encounter an issue, or a feature you'd like to request, submit it on the ",a(href="https://github.com/mcsiple/novelgazing", "GitHub repo for this project") ),
+                             tags$li("Love the illustrations? Follow", a(href="https://www.instagram.com/badger_friend/","@badger_friend"),"on Instagram")),
+                          imageOutput('books_hug')
+                          )
 )
 
 
@@ -210,7 +199,43 @@ server <- function(input, output) {
       }
    })
    
-   # Basic diagnostic plots
+   
+
+# Basic all-time book info ------------------------------------------------
+   output$short_long <- function(){
+      if(is.null(rawdatafile())){NULL}else{
+         dat <- cleanup_csv(rawdatafile())
+         s <- sltable(cleaned_books = dat)
+         kable(s) %>%
+            kable_styling(bootstrap_options ="bordered", full_width = F) %>%
+            column_spec(1, bold = TRUE)
+         
+      }}
+   
+   output$top3authcount <- function(){
+      if(is.null(rawdatafile())){NULL}else{
+         dat <- cleanup_csv(rawdatafile())
+         s <- top3authors(cleaned_books = dat,ranking = 'count')
+         kable(s) %>%
+            kable_styling(bootstrap_options = "bordered", full_width = F)
+      }}
+   
+   output$top3authrating <- function(){
+      if(is.null(rawdatafile())){NULL}else{
+         dat <- cleanup_csv(rawdatafile())
+         s <- top3authors(cleaned_books = dat,ranking = 'rating')
+         kable(s) %>%
+            kable_styling(bootstrap_options ="bordered", full_width = F)
+      }}
+   
+   output$likeplot <- renderPlot({
+      if(is.null(rawdatafile())){NULL}else{
+         plotdat <- cleanup_csv(rawdatafile())
+         likeplot(plotdat)}
+   })
+# Long-term info ----------------------------------------------------------
+
+
    output$basicstuff <- renderPlot({
       if(is.null(rawdatafile())){NULL}else{
          plotdat <- cleanup_csv(rawdatafile())
@@ -221,10 +246,10 @@ server <- function(input, output) {
       cleaned_books <- cleanup_csv(rawdatafile())
       genrelist <- list()
       n <- nrow(cleaned_books)
-      withProgress(message = 'Getting genre data',{
+      withProgress(message = 'Getting subject data',{
          for(i in 1:nrow(cleaned_books)){
                genrelist[[i]] <- get_genre(cleaned_books = cleaned_books,i = i)
-               incProgress(1/n, detail = paste("Extracting genres for book", i,"of",n))
+               incProgress(1/n, detail = paste("Extracting subjects for book", i,"of",n))
             }
          }
       ) #end withProgress section
@@ -258,53 +283,42 @@ server <- function(input, output) {
       if(is.null(rawdatafile())){NULL}else{
          c <- cleanup_csv(rawdatafile())
          yrs <- time_to_finish_shelves(cleaned_csv = c,pal = bookpal)$nyears_to_finish
-         textout <- paste('At your current rate, it will take you','<b>', yrs,'</b>','years to finish everything on your shelves.')
+         textout <- paste('At your current rate, it will take you',
+                          '<b>',
+                          yrs,
+                          '</b>',
+                          'years to finish everything on your shelves.')
          HTML(paste(textout))
       }
    })
-   
-   
-   # Scraped data and sentiments -FIXXXX
-   output$sentiments <- renderPlot({
-      x <- get_cmatrix_and_genres(fulldata = full_data())$goodreads_read
-      #help :(
-      #tidied <- tidy_the_books(read_books_data = x)
-      #get_bing_plot(tidied_books = tidied,pal = bookpal)
-      plot(1:10,1:10)
-   })
-   
-   output$afinn <- renderPlot({ #FIXXXX
-      x <- get_cmatrix_and_genres(scraped_data = scraped_data())$goodreads_read
-      plot(1:10,1:10)
-      #tidied <- tidy_the_books(read_books_data = x)
-      # silly workaround (sorry 2 me)
-      #get_AFINN_plot(tidied_books = tidied,afinnsentiments = afinn_man)
-   })
-   
-   # output$keywords <- function(){ #fixxxx
-   #    x <- get_cmatrix_and_genres(scraped_data = scraped_data())$goodreads_read
-   #    
-      # tidied <- tidy_the_books(read_books_data = x)
-      # df <- get_word_table(tidied_books = tidied) %>%
-      #    rename('Year read'=year_read,
-      #           'Word'=word,
-      #           'Number of times this word appears in your read shelf'=n) %>%
-      #    as.data.frame() 
-      # df <- df[1:10,]
-      # 
-      # kable(df) %>%
-      #    kable_styling("striped", full_width = F) 
-   #}
 
 # Ecology tab -------------------------------------------------------------
-
+   output$HTTP_status <- renderUI({
+      c <- cleanup_csv(rawdatafile())
+      firstrealisbn <- c$isbn[which(c$isbn != '')[1]]
+      test <-  httr::GET(paste0('https://openlibrary.org/api/books?bibkeys=ISBN:',firstrealisbn,'&jscmd=data&format=json'))
+      if(httr::status_code(test) == 503){
+         txout <-  "The OpenLibrary Server is returning a 503 error. Try again later!"}else{
+            txout <- ""
+         }
+         HTML(txout)
+   })
    
    output$rainbow_yr <- renderPlot({
-      get_rainbow_plot(comm_genre = comm_genres(),pal = bookpal,whichplot = 'yearly')
+      get_rainbow_plot(comm_genre = comm_genres(),
+                       pal = bookpal,
+                       whichplot = 'yearly')
    })
    
    output$rainbow_month <- renderPlot({
-      get_rainbow_plot(comm_genre = comm_genres(),pal = bookpal,whichplot = 'monthly')
+      get_rainbow_plot(comm_genre = comm_genres(),
+                       pal = bookpal,
+                       whichplot = 'monthly')
+   })
+   
+   output$circles <- renderPlot({
+      c <- cleanup_csv(rawdatafile())
+      monthfigure(cleaned_csv = c)
    })
    
    output$diversity <- renderPlot({
@@ -325,11 +339,20 @@ server <- function(input, output) {
       }
    })
    
-   output$mdscomp <- renderPlot({
+   mds_react <- eventReactive(input$mds_go,{
       x <- get_cmatrix_and_genres(fulldata = full_data())
       y <- x$community
       z <- x$community_toread
-      get_mds_comp(community = y,community_toread = z,pal = bookpal)
+      plotout <- get_mds_comp(community = y,community_toread = z,pal = bookpal)
+      plotout
+   })
+   
+   output$mdscomp <- renderPlot({
+      mds_react()
+      # x <- get_cmatrix_and_genres(fulldata = full_data())
+      # y <- x$community
+      # z <- x$community_toread
+      # plotout <- get_mds_comp(community = y,community_toread = z,pal = bookpal)
    })
    
 
